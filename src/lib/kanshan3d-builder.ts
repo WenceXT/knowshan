@@ -205,106 +205,148 @@ export function buildSmoothSDFMesh(
   return new THREE.Mesh(bakedGeo, material);
 }
 
+export interface ArticulatedArm {
+  shoulder: THREE.Group;
+  elbow: THREE.Group;
+  wrist: THREE.Group;
+}
+
+export interface ArticulatedLeg {
+  hip: THREE.Group;
+  knee: THREE.Group;
+  ankle: THREE.Group;
+}
+
 /**
- * Slender Charcoal-Black Arm + Cute 4-Fingered Hand (3 plump fingers + 1 opposable thumb, per Photos 1–4!)
+ * 2-Joint Articulated Charcoal Arm (Shoulder -> Elbow -> Wrist + 4-Fingered Hand)
+ * Eliminates stiff straight-stick arms with natural A-frame hang & organic elbow/wrist follow-through!
  */
 export function buildFourFingeredArm(
   side: number,
   S: number,
   limbMat: THREE.Material
-): THREE.Group {
-  const armY = 0.02;
-  const armZ = -0.01;
+): ArticulatedArm {
+  const armY = 0.025;
+  const armZ = -0.005;
   const shoulderSurfX = findSurfaceX(armY, armZ);
 
-  const pivot = new THREE.Group();
-  pivot.position.set(side * (shoulderSurfX - 0.032) * S, armY * S, armZ * S);
+  const shoulder = new THREE.Group();
+  shoulder.position.set(side * (shoulderSurfX - 0.030) * S, armY * S, armZ * S);
 
-  // Seamless shoulder joint sphere tucked inside torso
   const shoulderCap = new THREE.Mesh(new THREE.SphereGeometry(0.042 * S, 16, 16), limbMat);
-  pivot.add(shoulderCap);
+  shoulder.add(shoulderCap);
 
-  // Gently curved slender charcoal arm
-  const armCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(0, 0, 0),
-    new THREE.Vector3(side * 0.055 * S, -0.15 * S, 0.018 * S),
-    new THREE.Vector3(side * 0.052 * S, -0.31 * S, 0.048 * S),
-  ]);
-
-  const armTube = new THREE.Mesh(
-    new THREE.TubeGeometry(armCurve, 22, 0.038 * S, 16, false),
+  // Upper arm segment (shoulder -> elbow)
+  const upperLen = 0.155 * S;
+  const upperArm = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.037 * S, upperLen, 10, 16),
     limbMat
   );
-  armTube.castShadow = true;
-  pivot.add(armTube);
+  upperArm.position.set(side * 0.018 * S, -upperLen * 0.52, 0.006 * S);
+  upperArm.rotation.z = side * 0.11;
+  upperArm.castShadow = true;
+  shoulder.add(upperArm);
 
-  // Cute 4-Fingered Mitten Hand (Palm + Thumb + 3 Rounded Fingers!)
-  const handGroup = new THREE.Group();
-  handGroup.position.set(side * 0.052 * S, -0.32 * S, 0.052 * S);
+  // Elbow joint pivot
+  const elbow = new THREE.Group();
+  elbow.position.set(side * 0.034 * S, -upperLen * 1.02, 0.012 * S);
+  shoulder.add(elbow);
 
-  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.052 * S, 18, 16), limbMat);
-  palm.scale.set(0.78, 1.05, 0.95);
+  const forearmLen = 0.145 * S;
+  const forearm = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.035 * S, forearmLen, 10, 16),
+    limbMat
+  );
+  forearm.position.set(side * 0.008 * S, -forearmLen * 0.5, 0.012 * S);
+  forearm.rotation.x = 0.08;
+  forearm.castShadow = true;
+  elbow.add(forearm);
+
+  // Wrist + 4-Fingered Mitten Hand
+  const wrist = new THREE.Group();
+  wrist.position.set(side * 0.014 * S, -forearmLen * 1.02, 0.022 * S);
+  elbow.add(wrist);
+
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.050 * S, 18, 16), limbMat);
+  palm.scale.set(0.78, 1.05, 0.96);
   palm.castShadow = true;
-  handGroup.add(palm);
+  wrist.add(palm);
 
-  // Thumb pointing forward/upward
   const thumb = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.017 * S, 0.032 * S, 8, 12),
+    new THREE.CapsuleGeometry(0.0165 * S, 0.030 * S, 8, 12),
     limbMat
   );
-  thumb.position.set(-side * 0.012 * S, -0.01 * S, 0.048 * S);
+  thumb.position.set(-side * 0.012 * S, -0.008 * S, 0.046 * S);
   thumb.rotation.x = Math.PI * 0.34;
   thumb.rotation.z = side * 0.25;
-  handGroup.add(thumb);
+  wrist.add(thumb);
 
-  // 3 plump rounded fingers fanned slightly (exact silhouette from Photos 1, 2, 4!)
   [-0.24, 0, 0.24].forEach((fan, idx) => {
-    const len = idx === 1 ? 0.042 * S : 0.036 * S;
+    const len = idx === 1 ? 0.040 * S : 0.034 * S;
     const finger = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.0165 * S, len, 8, 12),
+      new THREE.CapsuleGeometry(0.016 * S, len, 8, 12),
       limbMat
     );
     finger.position.set(
       side * 0.004 * S,
-      (-0.048 - (idx === 1 ? 0.004 : 0)) * S,
-      (-fan * 0.095 + 0.006) * S
+      (-0.046 - (idx === 1 ? 0.004 : 0)) * S,
+      (-fan * 0.092 + 0.006) * S
     );
     finger.rotation.x = -fan * 0.55 + 0.12;
     finger.castShadow = true;
-    handGroup.add(finger);
+    wrist.add(finger);
   });
 
-  pivot.add(handGroup);
-  return pivot;
+  return { shoulder, elbow, wrist };
 }
 
 /**
- * Sturdy Charcoal-Black Standing Leg + Plump Forward-Rounded Boot (Sole strictly at local y = -0.34 * S, per Photos 3 & 4!)
+ * 2-Joint Articulated Standing Leg (Hip -> Knee -> Ankle + Plump Boot, Sole at local y = -0.34 * S)
+ * Supports supple knee-bend cushioned breathing, weight shifts, and natural stepping!
  */
 export function buildStandingLeg(
   side: number,
   S: number,
   limbMat: THREE.Material
-): THREE.Group {
-  const hipPivot = new THREE.Group();
-  hipPivot.position.set(side * 0.145 * S, -0.455 * S, -0.005 * S);
+): ArticulatedLeg {
+  const hip = new THREE.Group();
+  hip.position.set(side * 0.145 * S, -0.455 * S, -0.005 * S);
 
-  // Hip joint sphere tucked cleanly inside white lower belly
   const hipCap = new THREE.Mesh(new THREE.SphereGeometry(0.058 * S, 16, 16), limbMat);
-  hipPivot.add(hipCap);
+  hip.add(hipCap);
 
-  // Sturdy vertical charcoal leg cylinder
-  const shaft = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.054 * S, 0.060 * S, 0.26 * S, 22),
+  // Thigh segment
+  const thighLen = 0.135 * S;
+  const thigh = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.055 * S, 0.057 * S, thighLen, 20),
     limbMat
   );
-  shaft.position.y = -0.135 * S;
-  shaft.castShadow = true;
-  hipPivot.add(shaft);
+  thigh.position.y = -thighLen * 0.5;
+  thigh.castShadow = true;
+  hip.add(thigh);
 
-  // Plump forward-pointing rounded boot/foot (flat cushioned sole at y = -0.34 * S!)
-  const bootGroup = new THREE.Group();
-  bootGroup.position.set(0, -0.285 * S, 0.042 * S);
+  // Knee joint pivot
+  const knee = new THREE.Group();
+  knee.position.y = -thighLen;
+  hip.add(knee);
+
+  const kneeCap = new THREE.Mesh(new THREE.SphereGeometry(0.055 * S, 14, 14), limbMat);
+  knee.add(kneeCap);
+
+  // Shin segment
+  const shinLen = 0.135 * S;
+  const shin = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.056 * S, 0.060 * S, shinLen, 20),
+    limbMat
+  );
+  shin.position.y = -shinLen * 0.5;
+  shin.castShadow = true;
+  knee.add(shin);
+
+  // Ankle + Rounded Boot (sole strictly at -0.34 * S when straight!)
+  const ankle = new THREE.Group();
+  ankle.position.set(0, -shinLen - 0.015 * S, 0.042 * S);
+  knee.add(ankle);
 
   const bootMain = new THREE.Mesh(
     new THREE.CapsuleGeometry(0.056 * S, 0.078 * S, 14, 20),
@@ -314,16 +356,14 @@ export function buildStandingLeg(
   bootMain.scale.set(1.12, 1.0, 0.96);
   bootMain.castShadow = true;
   bootMain.receiveShadow = true;
-  bootGroup.add(bootMain);
+  ankle.add(bootMain);
 
-  // Subtle rounded heel blend
   const heel = new THREE.Mesh(new THREE.SphereGeometry(0.058 * S, 16, 14), limbMat);
   heel.scale.set(1.04, 0.92, 1.0);
   heel.position.set(0, 0.004 * S, -0.036 * S);
-  bootGroup.add(heel);
+  ankle.add(heel);
 
-  hipPivot.add(bootGroup);
-  return hipPivot;
+  return { hip, knee, ankle };
 }
 
 /**

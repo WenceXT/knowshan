@@ -441,7 +441,7 @@ export default function CozyKnowShanApp() {
       {/* MAIN STAGE                                                      */}
       {/* =============================================================== */}
       <div
-        className={`relative overflow-hidden bg-gradient-to-b from-[#bdd6f4] via-[#ddebfb] to-[#b5d2f3] ${
+        className={`relative overflow-hidden bg-gradient-to-b from-[#9dc0ec] via-[#bfd8f6] to-[#a9caf0] ${
           isFullWindow
             ? "w-screen h-screen"
             : "w-full max-w-[430px] h-[100dvh] sm:h-[92vh] sm:max-h-[900px] sm:rounded-[46px] sm:border-[6px] sm:border-white/90 sm:shadow-[0_24px_80px_rgba(56,89,138,0.22)]"
