@@ -825,6 +825,7 @@ export default function CozyKnowShanApp() {
         {drawer === "burrow" && (
           <BurrowChatModal
             store={store}
+            isFullWindow={isFullWindow}
             onStoreChange={setStore}
             onClose={() => setDrawer(null)}
             onGenerateSnowballFromSession={(sessionId) =>

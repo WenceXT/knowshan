@@ -3,21 +3,19 @@
 import React, { useEffect, useRef, useState } from "react";
 import { ChatSession, DollVoiceRecord, KnowShanStore } from "@/types/knowshan";
 import {
-  apiAddDollVoiceRecord,
-  apiClearAllChatSessions,
   apiContinueFromDollVoice,
   apiCreateNewChatSession,
   apiDeleteChatSession,
   apiDeleteDollVoice,
   apiSelectChatSession,
   apiSendBurrowMessage,
-  apiToggleSessionPermission,
 } from "@/lib/client-api";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
 
 interface BurrowChatModalProps {
   store: KnowShanStore;
+  isFullWindow: boolean;
   onStoreChange: (next: KnowShanStore) => void;
   onClose: () => void;
   onGenerateSnowballFromSession: (sessionId: string) => void;
@@ -26,22 +24,21 @@ interface BurrowChatModalProps {
 
 export default function BurrowChatModal({
   store,
+  isFullWindow,
   onStoreChange,
   onClose,
   onGenerateSnowballFromSession,
   showToast,
 }: BurrowChatModalProps) {
   const [sidebarTab, setSidebarTab] = useState<"sessions" | "doll_voices">("sessions");
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [drawerOpen, setDrawerOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [inputText, setInputText] = useState("");
   const [sending, setSending] = useState(false);
 
-  // Voice recording inside Burrow Chat
   const [isRecording, setIsRecording] = useState(false);
   const [recordSec, setRecordSec] = useState(0);
   const [pendingAudioUrl, setPendingAudioUrl] = useState<string | undefined>(undefined);
-  const [micHint, setMicHint] = useState<string | null>(null);
   const [playingId, setPlayingId] = useState<string | null>(null);
 
   const scrollEndRef = useRef<HTMLDivElement | null>(null);
@@ -73,29 +70,21 @@ export default function BurrowChatModal({
   }, []);
 
   const qLower = searchQuery.trim().toLowerCase();
-  const filteredSessions = store.chatSessions.filter((s) => {
-    if (!qLower) return true;
-    return (
+  const filteredSessions = store.chatSessions.filter(
+    (s) =>
+      !qLower ||
       s.title.toLowerCase().includes(qLower) ||
       s.messages.some((m) => m.content.toLowerCase().includes(qLower))
-    );
-  });
-
-  const filteredVoices = store.dollVoiceRecords.filter((v) => {
-    if (!qLower) return true;
-    return v.transcript.toLowerCase().includes(qLower);
-  });
+  );
+  const filteredVoices = store.dollVoiceRecords.filter(
+    (v) => !qLower || v.transcript.toLowerCase().includes(qLower)
+  );
 
   const startVoiceRecording = async () => {
-    setMicHint(null);
     setRecordSec(0);
     setIsRecording(true);
+    timerRef.current = setInterval(() => setRecordSec((p) => p + 1), 1000);
 
-    timerRef.current = setInterval(() => {
-      setRecordSec((prev) => prev + 1);
-    }, 1000);
-
-    // Optional browser MediaRecorder for real voice playback
     if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
@@ -114,11 +103,10 @@ export default function BurrowChatModal({
         mr.start();
         mediaRecRef.current = mr;
       } catch {
-        setMicHint("未获取到麦克风权限，你仍可直接检查或手动输入文字发送");
+        // fallback cleanly to text
       }
     }
 
-    // Browser Web Speech API ASR
     if (typeof window !== "undefined") {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -131,21 +119,14 @@ export default function BurrowChatModal({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           rec.onresult = (e: any) => {
             let t = "";
-            for (let i = 0; i < e.results.length; i++) {
-              t += e.results[i][0].transcript;
-            }
+            for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
             if (t) setInputText(t);
-          };
-          rec.onerror = () => {
-            setMicHint("语音识别没听清，你可以直接编辑输入框文字或重试");
           };
           rec.start();
           speechRecRef.current = rec;
         } catch {
           // ignore
         }
-      } else {
-        setMicHint("当前浏览器暂不支持实时语音转写，停止录音后可补充文字");
       }
     }
   };
@@ -157,10 +138,6 @@ export default function BurrowChatModal({
     }
     try {
       speechRecRef.current?.stop();
-    } catch {
-      // ignore
-    }
-    try {
       mediaRecRef.current?.stop();
     } catch {
       // ignore
@@ -169,12 +146,10 @@ export default function BurrowChatModal({
     if (cancel) {
       setPendingAudioUrl(undefined);
       setRecordSec(0);
-      setMicHint(null);
       return;
     }
     if (!inputText.trim()) {
       setInputText("刚忙完松了一口气，想进树洞跟看山随便唠两句。");
-      setMicHint("已填入语音转写文本，确认无误后点发送即可");
     }
   };
 
@@ -188,7 +163,6 @@ export default function BurrowChatModal({
     setInputText("");
     setPendingAudioUrl(undefined);
     setRecordSec(0);
-    setMicHint(null);
 
     try {
       const res = await apiSendBurrowMessage({
@@ -220,7 +194,6 @@ export default function BurrowChatModal({
       audio.play().catch(() => setPlayingId(null));
       return;
     }
-    // Gentle browser TTS playback fallback for demo voice records
     if (typeof window !== "undefined" && "speechSynthesis" in window) {
       window.speechSynthesis.cancel();
       const utter = new SpeechSynthesisUtterance(transcript);
@@ -230,101 +203,96 @@ export default function BurrowChatModal({
       utter.onerror = () => setPlayingId(null);
       window.speechSynthesis.speak(utter);
     } else {
-      setTimeout(() => setPlayingId(null), 2200);
+      setTimeout(() => setPlayingId(null), 2000);
     }
-  };
-
-  const handleQuickDemoDollRecord = async () => {
-    const res = await apiAddDollVoiceRecord({
-      transcript: "刚刚开完组会手心还在出汗，还好提前准备了小手卡没有完全卡壳。",
-      durationSec: 7,
-    });
-    onStoreChange(res.store);
-    setSidebarTab("doll_voices");
-    showToast("已模拟录入一条来自 3D 玩偶的新语音记录");
   };
 
   const handleContinueFromVoice = (v: DollVoiceRecord) => {
     const res = apiContinueFromDollVoice(v.id);
     onStoreChange(res.store);
-    setMobileMenuOpen(false);
-    showToast("已接着玩偶里的这段语音继续聊天");
+    setDrawerOpen(false);
+    showToast("已接着玩偶录音继续聊天");
   };
+
+  const showStaticSidebar = isFullWindow;
 
   return (
     <div
-      className="absolute inset-0 z-40 bg-[#273e59]/28 backdrop-blur-[4px] flex items-center justify-center p-0 sm:p-4"
+      className="absolute inset-0 z-40 bg-[#273e59]/22 backdrop-blur-[3px] flex items-end sm:items-center justify-center p-0 sm:p-4"
       onClick={onClose}
     >
       <div
         onClick={(e) => e.stopPropagation()}
-        className="w-full h-full sm:h-[86vh] sm:max-w-[860px] sm:rounded-[34px] bg-[#f4f9ff]/98 border border-white shadow-[0_20px_60px_rgba(38,70,112,0.24)] flex overflow-hidden relative"
+        className={`w-full ${
+          isFullWindow ? "h-[86vh] max-w-[820px] rounded-[32px]" : "h-[85%] rounded-t-[34px]"
+        } bg-[#f7faff]/98 border border-white shadow-[0_18px_50px_rgba(38,70,112,0.22)] flex overflow-hidden relative`}
       >
         {/* =============================================================== */}
-        {/* LEFT COLUMN: SESSION MANAGEMENT & DOLL VOICE RECORDS            */}
+        {/* CLEAN SIDEBAR (Static in wide full-window; Slide-over in phone) */}
         {/* =============================================================== */}
         <div
           className={`${
-            mobileMenuOpen ? "flex absolute inset-y-0 left-0 z-30 w-[285px]" : "hidden"
-          } md:flex md:static md:w-[272px] shrink-0 bg-[#eaf3fd]/98 border-r border-white/90 flex-col p-3.5 gap-2.5`}
+            drawerOpen
+              ? "flex absolute inset-y-0 left-0 z-30 w-[264px] shadow-xl"
+              : showStaticSidebar
+              ? "hidden md:flex md:w-[252px]"
+              : "hidden"
+          } shrink-0 bg-[#edf4fd] border-r border-white flex-col p-3.5 gap-2.5`}
         >
-          <div className="flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
             <button
               onClick={() => {
-                const next = apiCreateNewChatSession();
-                onStoreChange(next);
+                onStoreChange(apiCreateNewChatSession());
                 setSidebarTab("sessions");
-                setMobileMenuOpen(false);
+                setDrawerOpen(false);
               }}
-              className="flex-1 py-2 px-3 rounded-full bg-[#63a4f7] hover:bg-[#4f93ee] text-white text-[12.5px] font-bold shadow-2xs flex items-center justify-center gap-1 cursor-pointer"
+              className="flex-1 py-2 rounded-full bg-[#63a4f7] hover:bg-[#4e92ee] text-white text-[12.5px] font-bold cursor-pointer transition"
             >
-              <span>+ 新建聊天</span>
+              + 新对话
             </button>
-            <button
-              onClick={() => setMobileMenuOpen(false)}
-              className="md:hidden w-8 h-8 rounded-full bg-white text-[#647890] flex items-center justify-center cursor-pointer"
-            >
-              ×
-            </button>
+            {drawerOpen && (
+              <button
+                onClick={() => setDrawerOpen(false)}
+                className="w-8 h-8 rounded-full bg-white text-[#647890] flex items-center justify-center cursor-pointer"
+              >
+                ×
+              </button>
+            )}
           </div>
 
-          {/* Keyword Search */}
           <input
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="搜索历史聊天或玩偶录音…"
-            className="w-full px-3 py-1.5 rounded-full bg-white/95 border border-[#d8e7fa] text-[12px] text-[#4c3b2e] placeholder:text-[#94a6bc] focus:outline-none"
+            placeholder="搜索记录…"
+            className="w-full px-3.5 py-1.5 rounded-full bg-white text-[12px] text-[#4c3b2e] placeholder:text-[#9cb0c6] focus:outline-none"
           />
 
-          {/* Switcher: 历史会话 vs 来自玩偶的声音 */}
-          <div className="flex bg-white/80 p-0.5 rounded-full border border-[#ddeafa]">
+          <div className="flex bg-white/75 p-0.5 rounded-full">
             <button
               onClick={() => setSidebarTab("sessions")}
               className={`flex-1 py-1.5 rounded-full text-[11.5px] font-bold transition cursor-pointer ${
                 sidebarTab === "sessions"
-                  ? "bg-[#784315] text-white"
-                  : "text-[#6e5a49]"
+                  ? "bg-white text-[#6e4720] shadow-2xs"
+                  : "text-[#7a8da3]"
               }`}
             >
-              历史会话 ({store.chatSessions.length})
+              会话 ({store.chatSessions.length})
             </button>
             <button
               onClick={() => setSidebarTab("doll_voices")}
               className={`flex-1 py-1.5 rounded-full text-[11.5px] font-bold transition cursor-pointer ${
                 sidebarTab === "doll_voices"
-                  ? "bg-[#784315] text-white"
-                  : "text-[#6e5a49]"
+                  ? "bg-white text-[#6e4720] shadow-2xs"
+                  : "text-[#7a8da3]"
               }`}
             >
-              来自玩偶的声音 ({store.dollVoiceRecords.length})
+              玩偶声音 ({store.dollVoiceRecords.length})
             </button>
           </div>
 
-          {/* List Container */}
-          <div className="flex-1 overflow-y-auto space-y-2 pr-0.5">
-            {sidebarTab === "sessions" ? (
-              <>
-                {filteredSessions.map((sess) => {
+          <div className="flex-1 overflow-y-auto space-y-1.5 pr-0.5">
+            {sidebarTab === "sessions"
+              ? filteredSessions.map((sess) => {
                   const isActive = sess.id === activeSession?.id;
                   const lastMsg = sess.messages[sess.messages.length - 1];
                   return (
@@ -332,177 +300,115 @@ export default function BurrowChatModal({
                       key={sess.id}
                       onClick={() => {
                         onStoreChange(apiSelectChatSession(sess.id));
-                        setMobileMenuOpen(false);
+                        setDrawerOpen(false);
                       }}
-                      className={`p-2.5 rounded-[18px] transition cursor-pointer ${
+                      className={`group px-3 py-2.5 rounded-[16px] transition cursor-pointer ${
                         isActive
-                          ? "bg-white ring-2 ring-[#63a4f7] shadow-2xs"
-                          : "bg-white/70 hover:bg-white"
+                          ? "bg-white ring-1.5 ring-[#63a4f7] shadow-2xs"
+                          : "bg-white/60 hover:bg-white"
                       }`}
                     >
                       <div className="flex items-center justify-between gap-1">
                         <span className="text-[12.5px] font-bold text-[#4c3b2e] truncate">
                           {sess.title}
                         </span>
-                        <span className="text-[10px] text-[#8ea2ba] shrink-0">
-                          {sess.updatedAt}
-                        </span>
-                      </div>
-                      <p className="text-[11px] text-[#73859c] line-clamp-1 mt-0.5">
-                        {lastMsg?.content || "暂无消息"}
-                      </p>
-                      <div className="flex items-center justify-between mt-1.5 pt-1 border-t border-[#eef4fc] text-[10.5px]">
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onStoreChange(apiToggleSessionPermission(sess.id));
-                          }}
-                          className={`px-2 py-0.5 rounded-full font-semibold cursor-pointer ${
-                            sess.allowForCreation
-                              ? "bg-[#e3f0ff] text-[#3b7dd8]"
-                              : "bg-slate-100 text-[#94a3b8]"
-                          }`}
-                        >
-                          {sess.allowForCreation ? "✓ 已授权堆雪球" : "仅私密保存"}
-                        </button>
-
                         <button
                           onClick={(e) => {
                             e.stopPropagation();
                             onStoreChange(apiDeleteChatSession(sess.id));
-                            showToast("已删除该条会话");
                           }}
-                          className="text-[#9eb0c5] hover:text-[#ef4444] px-1 cursor-pointer"
+                          className="opacity-0 group-hover:opacity-100 text-[12px] text-[#a0b1c5] hover:text-[#ef4444] px-1 cursor-pointer"
                         >
-                          删除
+                          ×
                         </button>
                       </div>
+                      <p className="text-[11px] text-[#7f92a8] truncate mt-0.5">
+                        {lastMsg?.content || "新对话"}
+                      </p>
                     </div>
                   );
-                })}
-
-                {store.chatSessions.length > 1 && (
-                  <button
-                    onClick={() => {
-                      if (window.confirm("确定清空全部历史聊天记录吗？")) {
-                        onStoreChange(apiClearAllChatSessions());
-                        showToast("历史会话已清空");
-                      }
-                    }}
-                    className="w-full py-1.5 text-[11px] text-[#8496ab] hover:text-[#ef4444] cursor-pointer"
-                  >
-                    清空全部历史记录
-                  </button>
-                )}
-              </>
-            ) : (
-              <>
-                <div className="px-2 py-1.5 rounded-xl bg-[#fff9eb] border border-[#fde68a]/80 text-[11px] text-[#8a5a20] leading-snug">
-                  在主页长按 3D 刘看山的黑鼻子说话，录音会自动同步到这里。
-                  <button
-                    onClick={handleQuickDemoDollRecord}
-                    className="ml-1 underline font-bold cursor-pointer"
-                  >
-                    模拟录一条
-                  </button>
-                </div>
-
-                {filteredVoices.map((v) => (
+                })
+              : filteredVoices.map((v) => (
                   <div
                     key={v.id}
-                    className="p-3 rounded-[18px] bg-white shadow-2xs space-y-1.5 border border-[#e5effc]"
+                    className="p-2.5 rounded-[16px] bg-white/90 space-y-1.5"
                   >
-                    <div className="flex items-center justify-between text-[10.5px]">
-                      <span className="px-2 py-0.5 rounded-full bg-[#fef3c7] text-[#92400e] font-bold">
-                        {v.sourceLabel} · {v.durationSec}&quot;
+                    <div className="flex items-center justify-between text-[10.5px] text-[#8ea2ba]">
+                      <span className="font-bold text-[#b46914]">
+                        玩偶录音 · {v.durationSec}&quot;
                       </span>
-                      <span className="text-[#94a3b8]">{v.createdAt}</span>
+                      <button
+                        onClick={() => onStoreChange(apiDeleteDollVoice(v.id))}
+                        className="hover:text-[#ef4444] cursor-pointer"
+                      >
+                        ×
+                      </button>
                     </div>
-                    <p className="text-[12px] text-[#4c3b2e] leading-snug line-clamp-3">
-                      「{v.transcript}」
+                    <p className="text-[12px] text-[#4c3b2e] line-clamp-2 leading-snug">
+                      {v.transcript}
                     </p>
-                    <div className="flex items-center justify-between pt-1">
+                    <div className="flex items-center justify-between pt-0.5">
                       <button
                         onClick={() => handlePlayVoice(v.id, v.transcript, v.audioUrl)}
-                        className="px-2.5 py-1 rounded-full bg-[#edf5ff] text-[#3b7dd8] text-[11px] font-bold cursor-pointer"
+                        className="text-[11px] font-bold text-[#4a7ec7] cursor-pointer"
                       >
-                        {playingId === v.id ? "■ 停止播放" : "▶ 播放原声"}
+                        {playingId === v.id ? "■ 停止" : "▶ 听原声"}
                       </button>
-                      <div className="flex items-center gap-2">
-                        <button
-                          onClick={() => handleContinueFromVoice(v)}
-                          className="px-2.5 py-1 rounded-full bg-[#63a4f7] text-white text-[11px] font-bold cursor-pointer"
-                        >
-                          继续聊
-                        </button>
-                        <button
-                          onClick={() => {
-                            onStoreChange(apiDeleteDollVoice(v.id));
-                            showToast("已删除该条玩偶语音记录");
-                          }}
-                          className="text-[11px] text-[#9eb0c5] hover:text-[#ef4444] cursor-pointer"
-                        >
-                          删除
-                        </button>
-                      </div>
+                      <button
+                        onClick={() => handleContinueFromVoice(v)}
+                        className="px-2.5 py-0.5 rounded-full bg-[#e8f2ff] text-[#3b7dd8] text-[11px] font-bold cursor-pointer"
+                      >
+                        接着聊 ›
+                      </button>
                     </div>
                   </div>
                 ))}
-              </>
-            )}
           </div>
-
-          <button
-            onClick={onClose}
-            className="w-full py-2 rounded-full bg-white hover:bg-[#fdfbf7] text-[12px] font-bold text-[#784315] shadow-2xs cursor-pointer"
-          >
-            ← 返回宠物小窝
-          </button>
         </div>
 
         {/* =============================================================== */}
-        {/* RIGHT COLUMN: COMPANION AI CHAT WORKSPACE                       */}
+        {/* MAIN COMPANION CHAT AREA                                        */}
         {/* =============================================================== */}
-        <div className="flex-1 flex flex-col min-w-0 bg-gradient-to-b from-[#f8fbff] to-[#eef5fe]">
-          {/* Companion Top Bar */}
-          <div className="px-4 py-3 bg-white/85 backdrop-blur-md border-b border-[#e3eefb] flex items-center justify-between gap-2">
-            <div className="flex items-center gap-2.5 min-w-0">
+        <div className="flex-1 flex flex-col min-w-0 bg-gradient-to-b from-[#f9fbff] to-[#eff6ff]">
+          {/* Clean Single-Row Top Bar */}
+          <div className="px-4 py-3 bg-white/85 backdrop-blur-md border-b border-[#e8f0fb] flex items-center justify-between gap-2">
+            <div className="flex items-center gap-2 min-w-0">
               <button
-                onClick={() => setMobileMenuOpen(true)}
-                className="md:hidden px-2.5 py-1.5 rounded-full bg-[#eaf3fd] text-[#4a7ec7] text-[12px] font-bold shrink-0 cursor-pointer"
+                onClick={() => setDrawerOpen(!drawerOpen)}
+                className={`${
+                  showStaticSidebar ? "md:hidden" : ""
+                } w-8 h-8 rounded-full bg-[#edf4fc] text-[#4a7ec7] flex items-center justify-center shrink-0 cursor-pointer`}
+                title="历史与玩偶语音"
               >
-                记录 ({store.chatSessions.length})
+                <svg viewBox="0 0 20 20" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
+                  <line x1="3.5" y1="6" x2="16.5" y2="6" />
+                  <line x1="3.5" y1="10" x2="16.5" y2="10" />
+                  <line x1="3.5" y1="14" x2="12.5" y2="14" />
+                </svg>
               </button>
-              <div className="w-9 h-9 rounded-full bg-[#e6f2fe] border border-white overflow-hidden shrink-0">
+
+              <div className="w-8 h-8 rounded-full bg-[#e6f2fe] overflow-hidden shrink-0">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={`${BASE_PATH}/kanshan-anim/wave.gif`}
-                  alt="刘看山"
-                  className="w-9 h-9 object-cover"
-                />
+                <img src={`${BASE_PATH}/kanshan-anim/wave.gif`} alt="" className="w-8 h-8 object-cover" />
               </div>
-              <div className="min-w-0">
-                <div className="text-[14px] font-bold text-[#4c3b2e] truncate">
-                  {activeSession?.title || "树洞对话"}
-                </div>
-                <div className="text-[11px] text-[#7f92a8] truncate">
-                  另一个自己 · 聊天默认私密，不会自动公开
-                </div>
-              </div>
+
+              <span className="text-[14.5px] font-bold text-[#5a3d20] truncate">
+                {activeSession?.title || "树洞"}
+              </span>
             </div>
 
             <div className="flex items-center gap-1.5 shrink-0">
               {activeSession && (
                 <button
                   onClick={() => onGenerateSnowballFromSession(activeSession.id)}
-                  className="px-3 py-1.5 rounded-full bg-[#fff7d6] hover:bg-[#fef0b8] border border-[#fde68a] text-[11.5px] font-bold text-[#8a5314] cursor-pointer"
+                  className="px-3 py-1.5 rounded-full bg-[#edf4fc] hover:bg-[#dfeafa] text-[#4a7ec7] text-[12px] font-bold cursor-pointer"
                 >
-                  用这段经历生成草稿
+                  团成雪球
                 </button>
               )}
               <button
                 onClick={onClose}
-                className="w-8 h-8 rounded-full bg-[#e8f0fa] hover:bg-[#dbe7f6] flex items-center justify-center text-[#647890] cursor-pointer"
+                className="w-8 h-8 rounded-full bg-[#eef3fa] hover:bg-[#e2ebf7] flex items-center justify-center text-[#75889e] cursor-pointer"
               >
                 <svg viewBox="0 0 20 20" className="w-4 h-4" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
                   <line x1="5" y1="5" x2="15" y2="15" />
@@ -512,7 +418,7 @@ export default function BurrowChatModal({
             </div>
           </div>
 
-          {/* Chat Message Stream */}
+          {/* Messages */}
           <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
             {activeSession?.messages.map((m) => {
               const isUser = m.role === "user";
@@ -524,86 +430,58 @@ export default function BurrowChatModal({
                   {!isUser && (
                     <div className="w-7 h-7 rounded-full bg-white shadow-2xs overflow-hidden shrink-0">
                       {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img
-                        src={`${BASE_PATH}/kanshan-anim/idle.gif`}
-                        alt=""
-                        className="w-7 h-7 object-contain"
-                      />
+                      <img src={`${BASE_PATH}/kanshan-anim/idle.gif`} alt="" className="w-7 h-7 object-contain" />
                     </div>
                   )}
 
                   <div
-                    className={`max-w-[80%] px-3.5 py-2.5 rounded-[20px] text-[13px] leading-relaxed ${
+                    className={`max-w-[80%] px-3.5 py-2.5 rounded-[20px] text-[13.5px] leading-relaxed ${
                       isUser
                         ? "bg-[#63a4f7] text-white rounded-br-[6px]"
-                        : "bg-white text-[#4c3b2e] shadow-[0_2px_10px_rgba(140,170,210,0.12)] rounded-bl-[6px]"
+                        : "bg-white text-[#4c3b2e] shadow-[0_2px_10px_rgba(140,170,210,0.1)] rounded-bl-[6px]"
                     }`}
                   >
                     {(m.source === "doll" || m.inputType === "voice") && (
-                      <div
-                        className={`flex items-center justify-between gap-2 text-[11px] mb-1 pb-1 border-b ${
-                          isUser ? "border-white/25 text-white/90" : "border-slate-100 text-[#528be0]"
-                        }`}
+                      <button
+                        onClick={() => handlePlayVoice(m.id, m.content, m.audioUrl)}
+                        className={`flex items-center gap-1.5 text-[11px] font-bold mb-1 ${
+                          isUser ? "text-white/90" : "text-[#4a7ec7]"
+                        } cursor-pointer`}
                       >
-                        <span>
-                          {m.source === "doll" ? "来自玩偶鼻头语音" : "语音消息"}
-                          {m.durationSec ? ` · ${m.durationSec}"` : ""}
-                        </span>
-                        <button
-                          onClick={() => handlePlayVoice(m.id, m.content, m.audioUrl)}
-                          className="underline font-bold cursor-pointer"
-                        >
-                          {playingId === m.id ? "停止" : "播放"}
-                        </button>
-                      </div>
+                        <span>{playingId === m.id ? "■ 停止" : "▶ 语音"}</span>
+                        {m.durationSec && <span>{m.durationSec}&quot;</span>}
+                      </button>
                     )}
                     <div className="whitespace-pre-wrap">{m.content}</div>
-                    <div
-                      className={`text-[10px] mt-1 text-right ${
-                        isUser ? "text-white/75" : "text-[#9eb0c5]"
-                      }`}
-                    >
-                      {m.createdAt}
-                    </div>
                   </div>
                 </div>
               );
             })}
 
             {sending && (
-              <div className="flex items-center gap-2 text-[12px] text-[#7f92a8]">
-                <span className="px-3 py-2 rounded-[16px] bg-white shadow-2xs">
-                  看山正在认真听并组织回应…
-                </span>
-              </div>
+              <div className="text-[12px] text-[#8ea2ba] pl-9">看山正在听…</div>
             )}
             <div ref={scrollEndRef} />
           </div>
 
-          {/* Bottom Voice + Text Input Bar */}
-          <div className="p-3 bg-white/92 border-t border-[#e3eefb] space-y-2">
-            {micHint && (
-              <div className="text-[11px] text-[#b45309] bg-[#fffbeb] px-3 py-1 rounded-full">
-                {micHint}
-              </div>
-            )}
-
+          {/* Clean Input Bar */}
+          <div className="p-3 bg-white/90 border-t border-[#e8f0fb]">
             {isRecording ? (
-              <div className="flex items-center justify-between px-4 py-2 rounded-full bg-[#e8f2ff] border border-[#93c5fd]">
+              <div className="flex items-center justify-between px-4 py-2 rounded-full bg-[#e8f2ff]">
                 <div className="flex items-center gap-2 text-[12.5px] font-bold text-[#2563eb]">
-                  <span className="w-2.5 h-2.5 rounded-full bg-[#ef4444] animate-pulse" />
-                  <span>正在倾听你的声音（{recordSec}s）… {inputText && `「${inputText.slice(0, 18)}」`}</span>
+                  <span className="w-2 h-2 rounded-full bg-[#ef4444] animate-pulse" />
+                  <span>正在听（{recordSec}s）…</span>
                 </div>
                 <div className="flex items-center gap-2">
                   <button
                     onClick={() => stopVoiceRecording(false)}
                     className="px-3 py-1 rounded-full bg-[#63a4f7] text-white text-[12px] font-bold cursor-pointer"
                   >
-                    完成转写
+                    完成
                   </button>
                   <button
                     onClick={() => stopVoiceRecording(true)}
-                    className="px-2.5 py-1 rounded-full bg-white text-[#647890] text-[12px] font-semibold cursor-pointer"
+                    className="text-[12px] text-[#75889e] px-2 cursor-pointer"
                   >
                     取消
                   </button>
@@ -611,11 +489,10 @@ export default function BurrowChatModal({
               </div>
             ) : (
               <div className="flex items-center gap-2">
-                {/* Microphone Voice Button */}
                 <button
                   onClick={startVoiceRecording}
                   title="语音输入"
-                  className="w-10 h-10 rounded-full bg-[#eaf3fd] hover:bg-[#dbeafe] text-[#3b7dd8] flex items-center justify-center shrink-0 cursor-pointer transition"
+                  className="w-10 h-10 rounded-full bg-[#edf4fc] hover:bg-[#dfeafa] text-[#4a7ec7] flex items-center justify-center shrink-0 cursor-pointer transition"
                 >
                   <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
                     <rect x="9" y="3" width="6" height="11" rx="3" />
@@ -633,14 +510,14 @@ export default function BurrowChatModal({
                       handleSend();
                     }
                   }}
-                  placeholder="和「另一个自己」随便聊聊，按 Enter 发送…"
-                  className="flex-1 rounded-full bg-[#f4f8fd] border border-[#dde9f8] px-4 py-2.5 text-[13px] text-[#3f3125] placeholder:text-[#9ab0c7] focus:outline-none focus:bg-white"
+                  placeholder="跟看山随便聊聊…"
+                  className="flex-1 rounded-full bg-[#f3f7fd] px-4 py-2.5 text-[13.5px] text-[#3f3125] placeholder:text-[#9cb0c6] focus:outline-none focus:bg-white"
                 />
 
                 <button
                   disabled={!inputText.trim() || sending}
                   onClick={handleSend}
-                  className="px-4 py-2.5 rounded-full bg-[#63a4f7] hover:bg-[#4e92ee] disabled:opacity-40 text-white text-[13px] font-bold shrink-0 cursor-pointer transition"
+                  className="px-4 py-2.5 rounded-full bg-[#63a4f7] disabled:opacity-40 text-white text-[13px] font-bold shrink-0 cursor-pointer transition"
                 >
                   发送
                 </button>
