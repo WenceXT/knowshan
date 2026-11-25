@@ -144,6 +144,21 @@ export function findSurfaceX(y: number, z: number): number {
   return (lo + hi) * 0.5;
 }
 
+// Find exact front surface Z at a given (x, y) on the face so glasses wrap organically with zero floating corners!
+export function findFaceSurfaceZ(x: number, y: number): number {
+  let lo = 0.0;
+  let hi = 0.75;
+  for (let i = 0; i < 18; i++) {
+    const mid = (lo + hi) * 0.5;
+    if (evalCartoonKanshanSDF(x, y, mid) < 0) {
+      lo = mid;
+    } else {
+      hi = mid;
+    }
+  }
+  return (lo + hi) * 0.5;
+}
+
 export function buildSmoothSDFMesh(
   resolution: number,
   material: THREE.Material,
@@ -408,98 +423,189 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
 }
 
 /**
- * Builds Sleek Beveled 3D Eyeglasses with Translucent Lenses & Temple Arms!
+ * Builds Face-Wrapped Designer-Toy Cartoon Eyeglasses (matching reference screenshot!):
+ * - Contoured 3D rounded-trapezoid dark-slate frames wrapped smoothly onto `findFaceSurfaceZ(x, y)`
+ * - Saddle arch bridge sitting snugly right over the top curve of the snout
+ * - Curved glossy cartoon lenses with cute diagonal white anime glint reflection
+ * - Flush temple arms hugging the sides of the head
  */
-export function buildDetailedGlasses(S: number, eyeY: number, eyeZ: number, eyeSurfX: number): THREE.Group {
+export function buildDetailedGlasses(
+  S: number,
+  eyeY: number,
+  _eyeZ: number,
+  _eyeSurfX: number
+): THREE.Group {
   const group = new THREE.Group();
+
   const frameMat = new THREE.MeshStandardMaterial({
-    color: 0x222733,
-    roughness: 0.28,
-    metalness: 0.15,
-  });
-  const lensMat = new THREE.MeshStandardMaterial({
-    color: 0xe0f2fe,
-    transparent: true,
-    opacity: 0.26,
-    roughness: 0.1,
-    metalness: 0.3,
+    color: 0x262e3d,
+    roughness: 0.32,
+    metalness: 0.12,
   });
 
-  // Rounded-square frame shape with inner lens cutout
-  const makeRoundedRectPath = (hw: number, hh: number, r: number, isHole = false) => {
-    const p = isHole ? new THREE.Path() : new THREE.Shape();
-    p.moveTo(-hw + r, -hh);
-    p.lineTo(hw - r, -hh);
-    p.quadraticCurveTo(hw, -hh, hw, -hh + r);
-    p.lineTo(hw, hh - r);
-    p.quadraticCurveTo(hw, hh, hw - r, hh);
-    p.lineTo(-hw + r, hh);
-    p.quadraticCurveTo(-hw, hh, -hw, hh - r);
-    p.lineTo(-hw, -hh + r);
-    p.quadraticCurveTo(-hw, -hh, -hw + r, -hh);
-    return p;
+  // Crisp cartoon lens texture with subtle sky tint + diagonal white anime reflection glint!
+  const lensCanvas = document.createElement("canvas");
+  lensCanvas.width = 128;
+  lensCanvas.height = 128;
+  const lctx = lensCanvas.getContext("2d")!;
+  lctx.fillStyle = "rgba(219, 238, 255, 0.22)";
+  lctx.fillRect(0, 0, 128, 128);
+  lctx.strokeStyle = "rgba(255, 255, 255, 0.62)";
+  lctx.lineWidth = 14;
+  lctx.lineCap = "round";
+  lctx.beginPath();
+  lctx.moveTo(26, 96);
+  lctx.lineTo(86, 26);
+  lctx.stroke();
+  lctx.lineWidth = 6;
+  lctx.beginPath();
+  lctx.moveTo(54, 102);
+  lctx.lineTo(102, 46);
+  lctx.stroke();
+  const lensTex = new THREE.CanvasTexture(lensCanvas);
+  lensTex.colorSpace = THREE.SRGBColorSpace;
+
+  const lensMat = new THREE.MeshStandardMaterial({
+    map: lensTex,
+    transparent: true,
+    opacity: 0.85,
+    roughness: 0.12,
+    metalness: 0.1,
+    side: THREE.DoubleSide,
+    depthWrite: false,
+  });
+
+  // Smooth optical eyewear arc guaranteed >= faceSurface + 0.032 clearance so rims & bridge NEVER clip into snout!
+  const eyewearZ = (x: number, y: number) => {
+    const opticalArc = 0.446 - 1.18 * x * x;
+    const minClear = findFaceSurfaceZ(x, y) + 0.032;
+    return Math.max(opticalArc, minClear);
   };
 
-  const outer = makeRoundedRectPath(0.145, 0.115, 0.045, false) as THREE.Shape;
-  const inner = makeRoundedRectPath(0.112, 0.084, 0.032, true);
-  outer.holes.push(inner);
+  const sampleRoundedLensLoop = (
+    cx: number,
+    cy: number,
+    hw: number,
+    hh: number,
+    side: number,
+    steps: number
+  ): THREE.Vector3[] => {
+    const pts: THREE.Vector3[] = [];
+    for (let i = 0; i < steps; i++) {
+      const a = (i / steps) * Math.PI * 2;
+      const cosA = Math.cos(a);
+      const sinA = Math.sin(a);
+      const powCos = Math.sign(cosA) * Math.pow(Math.abs(cosA), 0.68);
+      const powSin = Math.sign(sinA) * Math.pow(Math.abs(sinA), 0.68);
+      const noseContour = sinA < 0 && side * cosA < 0 ? 0.88 : 1.0;
+      const lx = cx + powCos * hw * noseContour;
+      const ly = cy + powSin * hh;
+      const wz = eyewearZ(lx, ly) * S;
+      pts.push(new THREE.Vector3(lx * S, ly * S, wz));
+    }
+    return pts;
+  };
 
-  const rimGeo = new THREE.ExtrudeGeometry(outer, {
-    depth: 0.018,
-    bevelEnabled: true,
-    bevelThickness: 0.008,
-    bevelSize: 0.008,
-    bevelSegments: 4,
-  });
-
-  const lensShape = makeRoundedRectPath(0.114, 0.086, 0.032, false) as THREE.Shape;
-  const lensGeo = new THREE.ShapeGeometry(lensShape);
+  const centerX = 0.208;
+  const centerY = eyeY + 0.004;
+  const halfW = 0.078;
+  const halfH = 0.064;
 
   [-1, 1].forEach((side) => {
-    const frameGroup = new THREE.Group();
-    const rim = new THREE.Mesh(rimGeo, frameMat);
-    const lens = new THREE.Mesh(lensGeo, lensMat);
-    lens.position.z = 0.009;
-    frameGroup.add(rim, lens);
-
-    frameGroup.position.set(
-      side * (eyeSurfX + 0.015) * S,
-      eyeY * S,
-      (eyeZ + 0.065) * S
-    );
-    frameGroup.rotation.y = side * 0.34;
-    group.add(frameGroup);
-
-    // Temple arm going back gently along the side of the head!
-    const templeCurve = new THREE.CatmullRomCurve3([
-      new THREE.Vector3(side * (eyeSurfX + 0.09) * S, (eyeY + 0.02) * S, (eyeZ + 0.01) * S),
-      new THREE.Vector3(side * (eyeSurfX + 0.085) * S, (eyeY + 0.025) * S, -0.05 * S),
-      new THREE.Vector3(side * (eyeSurfX + 0.06) * S, (eyeY - 0.02) * S, -0.14 * S),
-    ]);
-    const temple = new THREE.Mesh(
-      new THREE.TubeGeometry(templeCurve, 16, 0.014, 10, false),
+    const cx = side * centerX;
+    const loopPts = sampleRoundedLensLoop(cx, centerY, halfW, halfH, side, 44);
+    const frameCurve = new THREE.CatmullRomCurve3(loopPts, true, "catmullrom", 0.5);
+    const rimMesh = new THREE.Mesh(
+      new THREE.TubeGeometry(frameCurve, 64, 0.017 * S, 16, true),
       frameMat
     );
-    group.add(temple);
+    rimMesh.castShadow = true;
+    group.add(rimMesh);
+
+    // Smoothly curved lens inside the optical rim!
+    const gridN = 8;
+    const positions: number[] = [];
+    const uvs: number[] = [];
+    const indices: number[] = [];
+    for (let iy = 0; iy <= gridN; iy++) {
+      const v = iy / gridN;
+      const ny = (v * 2 - 1) * 0.88;
+      for (let ix = 0; ix <= gridN; ix++) {
+        const u = ix / gridN;
+        const nx = (u * 2 - 1) * 0.88;
+        const rLen = Math.pow(Math.abs(nx), 3.0) + Math.pow(Math.abs(ny), 3.0);
+        const scaleBack = rLen > 1 ? 1 / Math.pow(rLen, 1 / 3.0) : 1.0;
+        const noseContour = ny < 0 && side * nx < 0 ? 0.88 : 1.0;
+        const px = cx + nx * scaleBack * halfW * noseContour;
+        const py = centerY + ny * scaleBack * halfH;
+        const pz = eyewearZ(px, py) - 0.004;
+        positions.push(px * S, py * S, pz * S);
+        uvs.push(u, v);
+      }
+    }
+    for (let iy = 0; iy < gridN; iy++) {
+      for (let ix = 0; ix < gridN; ix++) {
+        const a = iy * (gridN + 1) + ix;
+        const b = a + 1;
+        const c = a + (gridN + 1);
+        const d = c + 1;
+        indices.push(a, b, d, a, d, c);
+      }
+    }
+    const curvedLensGeo = new THREE.BufferGeometry();
+    curvedLensGeo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
+    curvedLensGeo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
+    curvedLensGeo.setIndex(indices);
+    curvedLensGeo.computeVertexNormals();
+    group.add(new THREE.Mesh(curvedLensGeo, lensMat));
+
+    // Outer Corner Hinge Lug + Temple Arm tucking neatly into the side of the head!
+    const outerX = side * (centerX + halfW * 0.98);
+    const outerY = centerY + 0.012;
+    const outerZ = eyewearZ(outerX, outerY);
+
+    const lug = new THREE.Mesh(new THREE.BoxGeometry(0.022 * S, 0.020 * S, 0.024 * S), frameMat);
+    lug.position.set(outerX * S, outerY * S, outerZ * S);
+    lug.rotation.y = side * 0.35;
+    group.add(lug);
+
+    const endSurfX = findSurfaceX(outerY - 0.01, 0.04);
+    const templeCurve = new THREE.CatmullRomCurve3([
+      new THREE.Vector3(outerX * S, outerY * S, outerZ * S),
+      new THREE.Vector3(side * (endSurfX + 0.008) * S, outerY * S, 0.16 * S),
+      new THREE.Vector3(side * (endSurfX - 0.01) * S, (outerY - 0.012) * S, 0.02 * S),
+    ]);
+    const templeMesh = new THREE.Mesh(
+      new THREE.TubeGeometry(templeCurve, 18, 0.013 * S, 12, false),
+      frameMat
+    );
+    group.add(templeMesh);
   });
 
-  // Curved bridge resting neatly above the snout!
-  const bridgeCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-0.14 * S, (eyeY + 0.01) * S, (eyeZ + 0.095) * S),
-    new THREE.Vector3(0, (eyeY + 0.055) * S, (eyeZ + 0.125) * S),
-    new THREE.Vector3(0.14 * S, (eyeY + 0.01) * S, (eyeZ + 0.095) * S),
-  ]);
-  const bridge = new THREE.Mesh(
-    new THREE.TubeGeometry(bridgeCurve, 18, 0.016, 12, false),
+  // Smooth Saddle Arch Bridge resting visibly on top of the snout behind the black nose!
+  const bridgePts: THREE.Vector3[] = [];
+  const innerEdgeX = centerX - halfW * 0.94;
+  for (let i = 0; i <= 14; i++) {
+    const u = (i / 14) * 2 - 1;
+    const bx = u * innerEdgeX;
+    const archLift = (1 - u * u) * 0.032;
+    const by = centerY + 0.016 + archLift;
+    const bz = eyewearZ(bx, by) + (1 - u * u) * 0.008;
+    bridgePts.push(new THREE.Vector3(bx * S, by * S, bz * S));
+  }
+  const bridgeCurve = new THREE.CatmullRomCurve3(bridgePts);
+  const bridgeMesh = new THREE.Mesh(
+    new THREE.TubeGeometry(bridgeCurve, 24, 0.016 * S, 14, false),
     frameMat
   );
-  group.add(bridge);
+  bridgeMesh.castShadow = true;
+  group.add(bridgeMesh);
 
   return group;
 }
 
 /**
- * Builds a Ribbed Knitted Winter Beanie sitting snugly between/on top of crown!
+ * Builds a Ribbed Knitted Winter Beanie sitting snugly & jauntily between the ears!
  */
 export function buildKnittedBeanie(S: number): THREE.Group {
   const group = new THREE.Group();
@@ -521,34 +627,38 @@ export function buildKnittedBeanie(S: number): THREE.Group {
     roughness: 0.95,
   });
 
+  const sub = new THREE.Group();
   const dome = new THREE.Mesh(
-    new THREE.SphereGeometry(0.24 * S, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.56),
+    new THREE.SphereGeometry(0.195 * S, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.58),
     hatMat
   );
-  dome.position.set(0, 0.43 * S, -0.01 * S);
-  dome.castShadow = true;
+  dome.scale.set(1.05, 0.95, 1.05);
 
-  // Plump rolled ribbed cuff
   const cuff = new THREE.Mesh(
-    new THREE.TorusGeometry(0.23 * S, 0.048 * S, 16, 36),
+    new THREE.TorusGeometry(0.19 * S, 0.042 * S, 16, 36),
     cuffMat
   );
   cuff.rotation.x = Math.PI / 2;
-  cuff.scale.set(1.04, 1, 0.85);
-  cuff.position.set(0, 0.45 * S, -0.01 * S);
+  cuff.position.y = 0.015 * S;
 
-  // Fluffy multi-tuft pom-pom
   const pomGroup = new THREE.Group();
-  pomGroup.position.set(0, 0.69 * S, -0.01 * S);
-  pomGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.068 * S, 16, 16), pomMat));
+  pomGroup.position.set(0, 0.21 * S, 0);
+  pomGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.056 * S, 16, 16), pomMat));
   for (let i = 0; i < 8; i++) {
     const a = (i / 8) * Math.PI * 2;
-    const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.036 * S, 10, 10), pomMat);
-    tuft.position.set(Math.cos(a) * 0.042 * S, Math.sin(a * 2) * 0.02 * S, Math.sin(a) * 0.042 * S);
+    const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.03 * S, 10, 10), pomMat);
+    tuft.position.set(
+      Math.cos(a) * 0.035 * S,
+      Math.sin(a * 2) * 0.015 * S,
+      Math.sin(a) * 0.035 * S
+    );
     pomGroup.add(tuft);
   }
 
-  group.add(dome, cuff, pomGroup);
+  sub.add(dome, cuff, pomGroup);
+  sub.position.set(0, 0.395 * S, -0.025 * S);
+  sub.rotation.x = -0.14; // Cute jaunty tilt slightly backward so it clears face & speech bubble!
+  group.add(sub);
   return group;
 }
 

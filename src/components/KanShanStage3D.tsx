@@ -11,6 +11,7 @@ import {
   buildPlushEarmuffs,
   buildSmoothSDFMesh,
   evalCartoonKanshanSDF,
+  findFaceSurfaceZ,
   findSurfaceX,
 } from "@/lib/kanshan3d-builder";
 
@@ -304,8 +305,8 @@ export default function KanShanStage3D({
       new THREE.SphereGeometry(1, 48, 36),
       noseBeanMat
     );
-    blackNoseMesh.scale.set(0.185 * S, 0.132 * S, 0.135 * S);
-    blackNoseMesh.position.set(0, 0.218 * S, 0.445 * S);
+    blackNoseMesh.scale.set(0.175 * S, 0.120 * S, 0.132 * S);
+    blackNoseMesh.position.set(0, 0.198 * S, 0.448 * S);
     blackNoseMesh.rotation.x = 0.06;
     blackNoseMesh.castShadow = true;
     blackNoseMesh.name = "nose";
@@ -320,22 +321,23 @@ export default function KanShanStage3D({
       kanshanRig.add(innerEar);
     });
 
-    // C) Expressive Cartoon Bead Eyes (with tiny white catchlight!) + Happy Crescent Eyes
-    const eyeY = 0.228;
-    const eyeZ = 0.205;
-    const eyeSurfX = findSurfaceX(eyeY, eyeZ);
+    // C) Forward-Facing Expressive Cartoon Bead Eyes (centered inside glasses & visible in 3/4!)
+    const eyeX = 0.212;
+    const eyeY = 0.252;
+    const eyeZ = findFaceSurfaceZ(eyeX, eyeY);
+    const eyeSurfX = eyeX;
 
     const beadEyesGroup = new THREE.Group();
     const catchlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
     const createBeadEye = (side: number) => {
       const eg = new THREE.Group();
-      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.038, 20, 20), eyeBeadMat);
-      bead.scale.set(0.95, 1.15, 0.9);
+      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.036, 20, 20), eyeBeadMat);
+      bead.scale.set(0.95, 1.15, 0.85);
       const glint = new THREE.Mesh(new THREE.SphereGeometry(0.011, 10, 10), catchlightMat);
-      glint.position.set(-side * 0.008, 0.014, 0.032);
+      glint.position.set(-side * 0.008, 0.014, 0.030);
       eg.add(bead, glint);
-      eg.position.set(side * (eyeSurfX - 0.004) * S, eyeY * S, eyeZ * S);
-      eg.rotation.y = side * 0.36;
+      eg.position.set(side * eyeX * S, eyeY * S, (eyeZ + 0.004) * S);
+      eg.rotation.y = side * 0.24;
       return eg;
     };
     const leftEye = createBeadEye(-1);
@@ -344,11 +346,11 @@ export default function KanShanStage3D({
     kanshanRig.add(beadEyesGroup);
 
     const happyEyesGroup = new THREE.Group();
-    const arcGeo = new THREE.TorusGeometry(0.046, 0.014, 12, 24, Math.PI * 0.85);
+    const arcGeo = new THREE.TorusGeometry(0.042, 0.013, 12, 24, Math.PI * 0.85);
     [-1, 1].forEach((side) => {
       const smile = new THREE.Mesh(arcGeo, eyeBeadMat);
-      smile.position.set(side * (eyeSurfX + 0.006) * S, eyeY * S, eyeZ * S);
-      smile.rotation.set(0.08, side * 0.44, Math.PI * 0.08);
+      smile.position.set(side * eyeX * S, (eyeY - 0.008) * S, (eyeZ + 0.012) * S);
+      smile.rotation.set(0.06, side * 0.26, Math.PI * 0.08);
       happyEyesGroup.add(smile);
     });
     happyEyesGroup.visible = false;
@@ -638,7 +640,7 @@ export default function KanShanStage3D({
       snowStack.scale.lerp(new THREE.Vector3(sScale, sScale, sScale), 0.15);
 
       const nScale = rec ? 0.94 : 1.0;
-      blackNoseMesh.scale.set(0.185 * S * nScale, 0.132 * S * nScale, 0.135 * S * nScale);
+      blackNoseMesh.scale.set(0.175 * S * nScale, 0.120 * S * nScale, 0.132 * S * nScale);
 
       // Breathing & Jelly Bounce
       sp.sx += (1 - sp.sx) * 0.14;
