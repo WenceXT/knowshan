@@ -237,7 +237,7 @@ export function createInitialStore(): KnowShanStore {
       hasDarkCircles: false,
       exp: 560,
       level: 5,
-      snowballProgress: 66,
+      snowballProgress: 20,
       unlockedItems: ["thick_glasses", "zhihu_scarf", "camp_beanie"],
       equippedItems: ["thick_glasses"],
       lastSyncAt: "00:32 · 小窝陪伴中",

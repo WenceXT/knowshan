@@ -77,7 +77,19 @@ export default function KanShanStage2D({
   const [isBlinking, setIsBlinking] = useState(false);
   const [squish, setSquish] = useState<"none" | "pat" | "nose">("none");
   const [hearts, setHearts] = useState<number[]>([]);
+  const [ambientExtra, setAmbientExtra] = useState(0);
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  useEffect(() => {
+    if ((pet.snowballProgress || 20) <= 18) setAmbientExtra(0);
+  }, [pet.snowballProgress]);
+
+  useEffect(() => {
+    const iv = setInterval(() => {
+      setAmbientExtra((prev) => Math.min(82, prev + 6));
+    }, 2000);
+    return () => clearInterval(iv);
+  }, []);
 
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;
@@ -150,6 +162,8 @@ export default function KanShanStage2D({
 
   const eq = pet.equippedItems || [];
   const isSmiling = isHuntingTreasure || pet.mood === "happy" || squish === "pat";
+  const effectiveSnow = Math.min(100, (pet.snowballProgress || 20) + ambientExtra);
+  const snowTier = effectiveSnow >= 80 ? 3 : effectiveSnow >= 48 ? 2 : 1;
 
   const faceX = look.x * 7;
   const faceY = look.y * 4;
@@ -182,8 +196,8 @@ export default function KanShanStage2D({
         }
         @keyframes ks-pat-snow {
           0%, 55%, 100% { transform: rotate(0deg); }
-          15%, 35% { transform: rotate(22deg); }
-          25% { transform: rotate(12deg); }
+          15%, 35% { transform: rotate(9deg); }
+          25% { transform: rotate(4deg); }
         }
         @keyframes ks-snow-squish {
           0%, 55%, 100% { transform: scale(1, 1); }
@@ -408,19 +422,19 @@ export default function KanShanStage2D({
                 />
               </g>
 
-              {/* Autonomous Snowman Stacking Side Arms */}
+              {/* Autonomous Non-Clipping Snowman Stacking Side Arms */}
               <g>
                 <g
                   style={{
-                    transformOrigin: "100px 236px",
+                    transformOrigin: "102px 242px",
                     animation: "ks-pat-snow 4.8s ease-in-out infinite",
                   }}
                 >
                   <path
-                    d="M100 236 Q66 264 56 304"
+                    d="M102 242 Q76 278 76 322"
                     fill="none"
                     stroke="#333e52"
-                    strokeWidth="22"
+                    strokeWidth="21"
                     strokeLinecap="round"
                   />
                 </g>
@@ -593,18 +607,40 @@ export default function KanShanStage2D({
                 </g>
               )}
 
-              {/* Self-Stacked Snowman Beside Liu Kanshan ("他自己在那堆") */}
+              {/* Progressive 1 -> 2 -> 3 Snowman Beside Liu Kanshan ("一开始只有一个雪球然后慢慢堆起来") */}
               <g onClick={onTapSnowman} className="cursor-pointer">
-                <circle cx="38" cy="376" r="28" fill="#ffffff" stroke="#cfe2f7" strokeWidth="3" />
-                <circle cx="40" cy="332" r="22" fill="#ffffff" stroke="#cfe2f7" strokeWidth="3" />
                 <g
                   style={{
-                    transformOrigin: "42px 296px",
-                    animation: "ks-snow-squish 4.8s ease-in-out infinite",
+                    transformOrigin: "34px 378px",
+                    animation:
+                      snowTier === 1 ? "ks-snow-squish 4.8s ease-in-out infinite" : undefined,
                   }}
                 >
-                  <circle cx="42" cy="294" r="18" fill="#ffffff" stroke="#cfe2f7" strokeWidth="3" />
+                  <circle cx="34" cy="378" r="25" fill="#ffffff" stroke="#cfe2f7" strokeWidth="3" />
                 </g>
+                {snowTier >= 2 && (
+                  <g
+                    style={{
+                      transformOrigin: "34px 338px",
+                      animation:
+                        snowTier === 2 ? "ks-snow-squish 4.8s ease-in-out infinite" : undefined,
+                    }}
+                  >
+                    <circle cx="34" cy="338" r="19" fill="#ffffff" stroke="#cfe2f7" strokeWidth="3" />
+                  </g>
+                )}
+                {snowTier >= 3 && (
+                  <g
+                    style={{
+                      transformOrigin: "34px 305px",
+                      animation: "ks-snow-squish 4.8s ease-in-out infinite",
+                    }}
+                  >
+                    <circle cx="34" cy="305" r="15" fill="#ffffff" stroke="#cfe2f7" strokeWidth="3" />
+                    <circle cx="29" cy="303" r="2" fill="#252e3f" />
+                    <circle cx="39" cy="303" r="2" fill="#252e3f" />
+                  </g>
+                )}
               </g>
             </g>
           </g>

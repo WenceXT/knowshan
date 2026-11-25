@@ -78,6 +78,9 @@ export default function KanShanStage3D({
     waveTimer: 0,
     patBoost: 1.8,
     treasureScale: 1,
+    ambientSnowTime: 0,
+    sb2Scale: 0,
+    sb3Scale: 0,
   });
   const rotYRef = useRef(-0.08);
   const rebuildTreasuresRef = useRef<((items: HoardedItem[]) => void) | null>(null);
@@ -97,6 +100,10 @@ export default function KanShanStage3D({
   useEffect(() => {
     petRef.current = pet;
     springRef.current.patBoost = 2.8;
+    // If snowball was just reset after publishing (< 20), restart ambient stacking from 1 ball!
+    if ((pet.snowballProgress || 20) <= 18) {
+      springRef.current.ambientSnowTime = 0;
+    }
   }, [pet.snowballProgress]);
 
   useEffect(() => {
@@ -402,7 +409,14 @@ export default function KanShanStage3D({
 
     const createTeardropArm = (side: number) => {
       const pivot = new THREE.Group();
-      pivot.position.set(side * (shoulderSurfX - 0.035) * S, armY * S, armZ * S);
+      pivot.position.set(side * (shoulderSurfX - 0.045) * S, armY * S, armZ * S);
+
+      // Seamless spherical shoulder joint tucked inside torso so no tube cap ever pokes out!
+      const shoulderCap = new THREE.Mesh(
+        new THREE.SphereGeometry(0.052 * K, 16, 16),
+        velvetSlateMat
+      );
+      pivot.add(shoulderCap);
 
       const armCurve = new THREE.CatmullRomCurve3([
         new THREE.Vector3(0, 0, 0),
@@ -468,10 +482,10 @@ export default function KanShanStage3D({
     kanshanRig.add(leftArm, rightArm);
 
     // =========================================================
-    // 3. SELF-STACKED SNOWBALLS BESIDE LIU KANSHAN ("他自己在那堆")
+    // 3. PROGRESSIVE 1 -> 2 -> 3 SNOWBALL STACK ("一开始只有一个雪球然后慢慢堆起来")
     // =========================================================
     const snowStack = new THREE.Group();
-    snowStack.position.set(-0.92 * K, -0.66 * K, 0.24 * K);
+    snowStack.position.set(-0.82 * K, -0.68 * K, 0.42 * K);
     const snowMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: 0.9,
@@ -479,24 +493,40 @@ export default function KanShanStage3D({
       emissiveIntensity: 0.14,
     });
 
-    const sb1 = new THREE.Mesh(new THREE.SphereGeometry(0.205 * K, 24, 24), snowMat);
-    sb1.scale.set(1.1, 0.88, 1.1);
-    sb1.position.set(0, 0.13 * K, 0);
+    // Ball 1: Always starts as a single plump snowball on the rug!
+    const sb1 = new THREE.Mesh(new THREE.SphereGeometry(0.172 * K, 24, 24), snowMat);
+    sb1.scale.set(1.08, 0.9, 1.08);
+    sb1.position.set(0, 0.14 * K, 0);
     sb1.castShadow = true;
     sb1.name = "snowman";
 
-    const sb2 = new THREE.Mesh(new THREE.SphereGeometry(0.165 * K, 24, 24), snowMat);
-    sb2.scale.set(1.06, 0.92, 1.06);
-    sb2.position.set(0.015 * K, 0.39 * K, 0);
+    // Ball 2: Stacked onto Ball 1 gradually as Kanshan pats!
+    const sb2 = new THREE.Mesh(new THREE.SphereGeometry(0.134 * K, 24, 24), snowMat);
+    sb2.position.set(0, 0.355 * K, 0);
     sb2.castShadow = true;
+    sb2.visible = false;
     sb2.name = "snowman";
 
-    const sb3 = new THREE.Mesh(new THREE.SphereGeometry(0.135 * K, 24, 24), snowMat);
-    sb3.position.set(0.025 * K, 0.61 * K, 0);
+    // Ball 3: Top head ball with cute pebble eyes, stacked last!
+    const sb3Group = new THREE.Group();
+    sb3Group.position.set(0, 0.525 * K, 0);
+    sb3Group.visible = false;
+
+    const sb3 = new THREE.Mesh(new THREE.SphereGeometry(0.104 * K, 24, 24), snowMat);
     sb3.castShadow = true;
     sb3.name = "snowman";
+    sb3Group.add(sb3);
 
-    snowStack.add(sb1, sb2, sb3);
+    [-1, 1].forEach((side) => {
+      const pebbleEye = new THREE.Mesh(
+        new THREE.SphereGeometry(0.015 * K, 12, 12),
+        pupilMat
+      );
+      pebbleEye.position.set(side * 0.036 * K, 0.012 * K, 0.098 * K);
+      sb3Group.add(pebbleEye);
+    });
+
+    snowStack.add(sb1, sb2, sb3Group);
     kanshanRig.add(snowStack);
 
     // =========================================================
@@ -548,8 +578,11 @@ export default function KanShanStage3D({
       const treasureHits = raycaster.intersectObjects(treasureHitMeshes, false);
       if (treasureHits.length > 0) return treasureHits[0].object.name;
 
+      const snowTargets: THREE.Object3D[] = [sb1];
+      if (sb2.visible) snowTargets.push(sb2);
+      if (sb3Group.visible) snowTargets.push(sb3);
       const hits = raycaster.intersectObjects(
-        [blackNoseMesh, sb1, sb2, sb3, whiteBodyMesh],
+        [blackNoseMesh, ...snowTargets, whiteBodyMesh],
         false
       );
       return hits.length > 0 ? hits[0].object.name : null;
@@ -637,6 +670,14 @@ export default function KanShanStage3D({
 
       const sp = springRef.current;
       if (sp.patBoost > 0) sp.patBoost = Math.max(0, sp.patBoost - dt);
+      // Gradually accumulate snow progress over time (~10s for 2nd ball, ~22s for 3rd ball!)
+      sp.ambientSnowTime = Math.min(30, sp.ambientSnowTime + dt);
+      const effectiveSnow = Math.min(
+        100,
+        (curPet.snowballProgress || 20) + sp.ambientSnowTime * 2.8
+      );
+      const snowTier = effectiveSnow >= 80 ? 3 : effectiveSnow >= 48 ? 2 : 1;
+
       sp.treasureScale += (1 - sp.treasureScale) * 0.12;
       treasuresGroup.scale.setScalar(sp.treasureScale);
 
@@ -681,18 +722,21 @@ export default function KanShanStage3D({
         rightEye.scale.set(0.92, blink ? 0.15 : 1.18, 0.7);
       }
 
-      const baseArmX = (shoulderSurfX - 0.035) * S;
-      // Left arm reaches over so paw lands cleanly on top of the 3rd snowball!
-      leftArm.position.set(
-        -(baseArmX + 0.06 * S * sp.armLerp),
-        (armY + 0.08 * sp.armLerp - patWave * 0.038) * S,
-        (armZ + 0.1 * sp.armLerp) * S
-      );
-      leftArm.rotation.x = -sp.armLerp * (0.48 + patWave * 0.2);
-      leftArm.rotation.y = -sp.armLerp * 0.18;
-      leftArm.rotation.z = -sp.armLerp * (0.42 - patWave * 0.16) + (1 - sp.armLerp) * Math.sin(t * 1.8) * 0.025;
+      const baseArmX = (shoulderSurfX - 0.045) * S;
+      // Keep shoulder pivot strictly anchored inside torso (ZERO floating shoulder stub!)
+      leftArm.position.set(-baseArmX, armY * S, armZ * S);
 
-      // Right arm stays relaxed or waves happily when patted
+      // Target non-clipping angles tailored to current snowball height (pats outer right cheek only!)
+      const targetRotX = snowTier === 1 ? -0.42 : snowTier === 2 ? -0.68 : -0.92;
+      const targetRotZ = snowTier === 1 ? -0.05 : snowTier === 2 ? -0.09 : -0.12;
+
+      leftArm.rotation.x = sp.armLerp * (targetRotX - patWave * 0.09);
+      leftArm.rotation.y = -sp.armLerp * 0.08;
+      leftArm.rotation.z =
+        sp.armLerp * (targetRotZ - patWave * 0.035) +
+        (1 - sp.armLerp) * Math.sin(t * 1.8) * 0.025;
+
+      // Right arm stays relaxed inside shoulder or waves happily when patted
       rightArm.position.set(baseArmX, armY * S, armZ * S);
       if (sp.waveTimer > 0) {
         rightArm.rotation.z = -2.1 + Math.sin(t * 16) * 0.28;
@@ -704,12 +748,28 @@ export default function KanShanStage3D({
         rightArm.rotation.z = -Math.sin(t * 1.8) * 0.025;
       }
 
-      // Snowman stays beside Kanshan and gently squishes as he pats the top snowball!
-      const progFactor = 0.88 + Math.min(1, (curPet.snowballProgress || 66) / 100) * 0.14;
-      snowStack.visible = true;
-      snowStack.scale.setScalar(progFactor);
-      sb3.scale.set(1 + patWave * 0.07, 1 - patWave * 0.09, 1 + patWave * 0.07);
-      sb3.position.y = (0.61 - patWave * 0.025) * K;
+      // Smoothly grow Ball 1 -> Ball 2 -> Ball 3 and gently squish whichever ball is on top!
+      sp.sb2Scale += ((snowTier >= 2 ? 1 : 0) - sp.sb2Scale) * 0.08;
+      sp.sb3Scale += ((snowTier >= 3 ? 1 : 0) - sp.sb3Scale) * 0.08;
+
+      const s1Squish = snowTier === 1 ? patWave * 0.06 : 0;
+      sb1.scale.set(1.08 + s1Squish, 0.9 - s1Squish, 1.08 + s1Squish);
+
+      sb2.visible = sp.sb2Scale > 0.03;
+      const s2Squish = snowTier === 2 ? patWave * 0.06 : 0;
+      sb2.scale.set(
+        (1.05 + s2Squish) * sp.sb2Scale,
+        (0.92 - s2Squish) * sp.sb2Scale,
+        (1.05 + s2Squish) * sp.sb2Scale
+      );
+
+      sb3Group.visible = sp.sb3Scale > 0.03;
+      const s3Squish = snowTier === 3 ? patWave * 0.06 : 0;
+      sb3Group.scale.set(
+        (1 + s3Squish) * sp.sb3Scale,
+        (1 - s3Squish) * sp.sb3Scale,
+        (1 + s3Squish) * sp.sb3Scale
+      );
 
       const nScale = rec ? 0.93 : 1.0;
       blackNoseMesh.scale.set(0.165 * S * nScale, 0.145 * S * nScale, 0.132 * S * nScale);
