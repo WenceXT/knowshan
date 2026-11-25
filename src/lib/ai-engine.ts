@@ -210,26 +210,78 @@ export function computePersonaMirror(mbti: string, _interests: string[]): {
 } {
   const code = mbti.toUpperCase();
   const map: Record<string, { mirrorTrait: string; speakingStyle: string }> = {
+    // 外交家 NF
     INFP: {
-      mirrorTrait: "安静嘴硬 · 怕生但超护短的小狐狸",
-      speakingStyle: "从不催你讲大道理，只会蹲在地毯上陪你把叹气变成星星",
+      mirrorTrait: "INFP 调停者 · 慢热护短的共情小狐狸",
+      speakingStyle: "从不催你讲大道理，只会蹲在地毯上陪你把叹气变成小雪球",
     },
-    INTJ: {
-      mirrorTrait: "酷酷傲娇 · 外冷内热的小狐狸",
-      speakingStyle: "平时戴着墨镜装酷，关键时刻总能一语点醒你",
+    INFJ: {
+      mirrorTrait: "INFJ 提倡者 · 一眼看穿心事的温柔小狐狸",
+      speakingStyle: "哪怕你只说半句话，也懂你没说出口的后半句，安静替你守着秘密",
     },
     ENFP: {
-      mirrorTrait: "上蹿下跳 · 快乐小狗魂北极狐",
-      speakingStyle: "尾巴摇得像螺旋桨，天大的烦心事都能陪你哈哈一笑混过去",
+      mirrorTrait: "ENFP 竞选者 · 快乐小狗魂的元气北极狐",
+      speakingStyle: "尾巴摇得像小螺旋桨，天大的烦心事都能陪你脑洞大开混过去",
     },
+    ENFJ: {
+      mirrorTrait: "ENFJ 主人公 · 随时给你撑腰的暖心小队长",
+      speakingStyle: "总能第一时间接住你的情绪，把你身上的闪光点一个个夸给你听",
+    },
+    // 分析家 NT
+    INTJ: {
+      mirrorTrait: "INTJ 建筑师 · 外冷内热的酷盖小狐狸",
+      speakingStyle: "平时推着黑框眼镜装深沉，关键时刻总能冷静帮你理清一团乱麻",
+    },
+    INTP: {
+      mirrorTrait: "INTP 逻辑学家 · 陪你半夜胡思乱想的猫系狐狸",
+      speakingStyle: "最喜欢听你聊奇奇怪怪的脑洞，凌晨两点还在认真陪你推演为什么",
+    },
+    ENTJ: {
+      mirrorTrait: "ENTJ 指挥官 · 嘴硬心软的靠谱大女主/男主狐",
+      speakingStyle: "嘴上嫌弃你内耗，爪子早就替你把下一步的退路铺得明明白白",
+    },
+    ENTP: {
+      mirrorTrait: "ENTP 辩论家 · 鬼点子超多的毒舌损友狐",
+      speakingStyle: "专治各种钻牛角尖，三言两语就能把你的社死现场变成脱口秀段子",
+    },
+    // 守护者 SJ
     ISTJ: {
-      mirrorTrait: "靠谱稳重 · 替你兜底的小管家",
-      speakingStyle: "记得你每一次熬夜和每一件小事，稳稳当当陪在手边",
+      mirrorTrait: "ISTJ 物流师 · 事事有回音的稳重小管家",
+      speakingStyle: "记得你每一次熬夜和每一件小事，稳稳当当守在冰屋桌角替你兜底",
+    },
+    ISFJ: {
+      mirrorTrait: "ISFJ 守卫者 · 把你照顾得妥帖周到的小棉袄",
+      speakingStyle: "总在细节里藏着温柔，天冷提醒加衣，心累了给你递上一杯热可可",
+    },
+    ESTJ: {
+      mirrorTrait: "ESTJ 总经理 · 行动力拉满的护短小班长",
+      speakingStyle: "不让你一个人在被窝里瞎纠结，陪你把大麻烦拆成小事一件件搞定",
+    },
+    ESFJ: {
+      mirrorTrait: "ESFJ 执政官 · 永远站在你这边的小太阳",
+      speakingStyle: "最见不得你受委屈，你一皱眉头就立刻端着小鱼干跑过来哄你",
+    },
+    // 探险家 SP
+    ISFP: {
+      mirrorTrait: "ISFP 探险家 · 浪漫随性的审美家小狐狸",
+      speakingStyle: "不爱讲条条框框，喜欢拉着你一起看窗外飘雪、收集亮晶晶的小废品",
+    },
+    ISTP: {
+      mirrorTrait: "ISTP 鉴赏家 · 话不多但超淡定的松弛感大师",
+      speakingStyle: "天塌下来也先淡定舔舔爪子，光是待在他旁边焦虑就会自动降一半",
+    },
+    ESTP: {
+      mirrorTrait: "ESTP 企业家 · 带你冲出内耗的潇洒行动派",
+      speakingStyle: "信奉先干了再说，再尴尬的场面在他眼里都只是一场好玩的冒险",
+    },
+    ESFP: {
+      mirrorTrait: "ESFP 表演者 · 把平淡日子过成烟花的开心果",
+      speakingStyle: "浑身都是快乐细胞，随时随地给你表演出一套翻跟头逗你笑出声",
     },
   };
   return (
     map[code] || {
-      mirrorTrait: `${code} 同频小北极狐`,
+      mirrorTrait: `${code} · 同频陪伴小北极狐`,
       speakingStyle: "安静待在你手边，随时接住你的碎碎念",
     }
   );

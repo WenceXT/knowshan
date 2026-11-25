@@ -31,6 +31,45 @@ type DrawerType =
   | "replies"
   | "settings";
 
+const MBTI_MENU_GROUPS = [
+  {
+    group: "外交家 · NF",
+    items: [
+      { code: "INFP", title: "调停者", desc: "慢热细腻、共情护短" },
+      { code: "INFJ", title: "提倡者", desc: "安静通透、懂你潜台词" },
+      { code: "ENFP", title: "竞选者", desc: "脑洞元气、快乐小狗魂" },
+      { code: "ENFJ", title: "主人公", desc: "温暖撑腰、善解人意" },
+    ],
+  },
+  {
+    group: "分析家 · NT",
+    items: [
+      { code: "INTJ", title: "建筑师", desc: "外冷内热、清醒理智" },
+      { code: "INTP", title: "逻辑学家", desc: "深夜奇思、猫系松弛" },
+      { code: "ENTJ", title: "指挥官", desc: "嘴硬心软、果断兜底" },
+      { code: "ENTP", title: "辩论家", desc: "幽默拆台、专治内耗" },
+    ],
+  },
+  {
+    group: "守护者 · SJ",
+    items: [
+      { code: "ISTJ", title: "物流师", desc: "事事回音、稳重靠谱" },
+      { code: "ISFJ", title: "守卫者", desc: "温柔妥帖、细节控" },
+      { code: "ESTJ", title: "总经理", desc: "行动干脆、拆解烦恼" },
+      { code: "ESFJ", title: "执政官", desc: "热情护犊、随时哄你" },
+    ],
+  },
+  {
+    group: "探险家 · SP",
+    items: [
+      { code: "ISFP", title: "探险家", desc: "浪漫随性、收集美好" },
+      { code: "ISTP", title: "鉴赏家", desc: "淡定松弛、从不慌张" },
+      { code: "ESTP", title: "企业家", desc: "潇洒直接、先干再说" },
+      { code: "ESFP", title: "表演者", desc: "开心果、把日子变烟花" },
+    ],
+  },
+];
+
 const VOICE_PRESETS = [
   {
     short: "下午汇报忘词了",
@@ -182,6 +221,7 @@ export default function CozyKnowShanApp() {
   const [chatInput, setChatInput] = useState("");
   const [busy, setBusy] = useState(false);
   const [selectedHoard, setSelectedHoard] = useState<HoardedItem | null>(null);
+  const [mbtiMenuOpen, setMbtiMenuOpen] = useState(true);
 
   const [draftInfo, setDraftInfo] = useState<{
     rawDraft: string;
@@ -477,7 +517,7 @@ export default function CozyKnowShanApp() {
                   {store.persona.nickname}
                 </div>
                 <div className="text-[12px] font-medium text-[#9e6534]">
-                  {store.persona.roleTag}
+                  {store.persona.roleTag} · {store.persona.mbti}
                 </div>
               </div>
             </div>
@@ -1142,42 +1182,136 @@ export default function CozyKnowShanApp() {
                 </div>
               )}
 
-              {/* SETTINGS */}
-              {drawer === "settings" && (
-                <div className="space-y-3">
-                  <div className="p-4 rounded-[22px] bg-white shadow-[0_2px_10px_rgba(148,179,214,0.12)]">
-                    <div className="text-[14px] font-bold text-[#5a4636]">
-                      {store.persona.mirrorTrait}
-                    </div>
-                    <p className="text-[13px] text-[#7c8da3] mt-1">{store.persona.speakingStyle}</p>
-                  </div>
-                  <div className="grid grid-cols-4 gap-2">
-                    {["INFP", "INTJ", "ENFP", "ISTJ"].map((code) => (
+              {/* SETTINGS: 16-MBTI PERSONAL SELECTION MENU */}
+              {drawer === "settings" && (() => {
+                const allMbti = MBTI_MENU_GROUPS.flatMap((g) => g.items);
+                const curItem =
+                  allMbti.find((m) => m.code === store.persona.mbti) || allMbti[0];
+                return (
+                  <div className="space-y-3">
+                    {/* Dropdown Menu Trigger Bar */}
+                    <div className="rounded-[22px] bg-white shadow-[0_2px_12px_rgba(148,179,214,0.14)] border border-[#e3eefb] overflow-hidden">
                       <button
-                        key={code}
-                        onClick={() => postState({ action: "update_persona", mbti: code })}
-                        className={`py-2.5 rounded-full text-[13px] font-bold cursor-pointer transition ${
-                          store.persona.mbti === code
-                            ? "bg-[#63a4f7] text-white"
-                            : "bg-white text-[#6e5a49] shadow-2xs"
-                        }`}
+                        onClick={() => setMbtiMenuOpen(!mbtiMenuOpen)}
+                        className="w-full px-4 py-3 flex items-center justify-between gap-2 hover:bg-[#f6faff] transition cursor-pointer"
                       >
-                        {code}
+                        <div className="flex items-center gap-2.5 text-left">
+                          <span className="px-2.5 py-1 rounded-xl bg-[#63a4f7] text-white text-[12px] font-bold">
+                            {curItem.code}
+                          </span>
+                          <div>
+                            <div className="text-[13px] font-bold text-[#4c3b2e]">
+                              我的 MBTI · {curItem.title}
+                            </div>
+                            <div className="text-[11px] text-[#8496ab]">{curItem.desc}</div>
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-1 text-[12px] font-semibold text-[#528be0]">
+                          <span>{mbtiMenuOpen ? "收起菜单" : "选择 MBTI"}</span>
+                          <svg
+                            viewBox="0 0 20 20"
+                            className={`w-4 h-4 transition-transform ${
+                              mbtiMenuOpen ? "rotate-180" : ""
+                            }`}
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2.2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                          >
+                            <polyline points="5 8 10 13 15 8" />
+                          </svg>
+                        </div>
                       </button>
-                    ))}
+
+                      {/* Grouped 16-Type Scrollable Menu */}
+                      {mbtiMenuOpen && (
+                        <div className="border-t border-[#edf3fc] max-h-52 overflow-y-auto px-2.5 py-2 space-y-2.5 bg-[#fbfdff]">
+                          {MBTI_MENU_GROUPS.map((grp) => (
+                            <div key={grp.group} className="space-y-1">
+                              <div className="px-2 text-[11px] font-bold text-[#8ea2ba]">
+                                {grp.group}
+                              </div>
+                              <div className="grid grid-cols-2 gap-1.5">
+                                {grp.items.map((item) => {
+                                  const active = store.persona.mbti === item.code;
+                                  return (
+                                    <button
+                                      key={item.code}
+                                      onClick={() => {
+                                        postState({ action: "update_persona", mbti: item.code });
+                                        setMbtiMenuOpen(false);
+                                        showToast(`已切换为 ${item.code} · ${item.title}`);
+                                      }}
+                                      className={`px-3 py-2 rounded-[14px] flex items-center justify-between text-left transition cursor-pointer ${
+                                        active
+                                          ? "bg-[#e3f0ff] ring-1.5 ring-[#63a4f7]"
+                                          : "bg-white hover:bg-[#f2f7fe] border border-[#eef4fb]"
+                                      }`}
+                                    >
+                                      <div className="min-w-0">
+                                        <div className="flex items-center gap-1.5">
+                                          <span
+                                            className={`text-[12px] font-bold ${
+                                              active ? "text-[#2b6cb0]" : "text-[#4c3b2e]"
+                                            }`}
+                                          >
+                                            {item.code}
+                                          </span>
+                                          <span className="text-[11px] font-semibold text-[#7a6552]">
+                                            {item.title}
+                                          </span>
+                                        </div>
+                                        <div className="text-[10px] text-[#8b9bb0] truncate">
+                                          {item.desc}
+                                        </div>
+                                      </div>
+                                      {active && (
+                                        <svg
+                                          viewBox="0 0 16 16"
+                                          className="w-4 h-4 text-[#3b82f6] shrink-0 ml-1"
+                                          fill="none"
+                                          stroke="currentColor"
+                                          strokeWidth="2.4"
+                                          strokeLinecap="round"
+                                          strokeLinejoin="round"
+                                        >
+                                          <polyline points="3.5 8.5 6.5 11.5 12.5 4.5" />
+                                        </svg>
+                                      )}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Mirrored Companion Trait Card */}
+                    <div className="p-3.5 rounded-[20px] bg-[#edf5ff]/85">
+                      <div className="text-[13px] font-bold text-[#4c3b2e]">
+                        {store.persona.mirrorTrait}
+                      </div>
+                      <p className="text-[12px] text-[#697d95] mt-1 leading-relaxed">
+                        {store.persona.speakingStyle}
+                      </p>
+                    </div>
+
+                    <button
+                      onClick={() => {
+                        postState({ action: "reset_storyline" });
+                        setDrawer(null);
+                        showToast("已回到最初");
+                      }}
+                      className="w-full py-2.5 rounded-full bg-[#edf3fa] hover:bg-[#e1ecf8] text-[13px] font-bold text-[#647890] cursor-pointer"
+                    >
+                      回到最初
+                    </button>
                   </div>
-                  <button
-                    onClick={() => {
-                      postState({ action: "reset_storyline" });
-                      setDrawer(null);
-                      showToast("已回到最初");
-                    }}
-                    className="w-full py-3 rounded-full bg-[#edf3fa] hover:bg-[#e1ecf8] text-[13px] font-bold text-[#647890] cursor-pointer"
-                  >
-                    回到最初
-                  </button>
-                </div>
-              )}
+                );
+              })()}
             </div>
           </div>
         )}

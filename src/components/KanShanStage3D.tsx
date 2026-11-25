@@ -7,13 +7,14 @@ import {
   buildContouredKnittedScarf,
   buildCuteCodfish,
   buildDetailedGlasses,
+  buildFourFingeredArm,
   buildKnittedBeanie,
   buildPlushEarmuffs,
   buildSmoothSDFMesh,
   buildSparklingRoomTreasure,
+  buildStandingLeg,
   evalCartoonKanshanSDF,
   findFaceSurfaceZ,
-  findSurfaceX,
 } from "@/lib/kanshan3d-builder";
 
 interface KanShanStage3DProps {
@@ -28,27 +29,11 @@ interface KanShanStage3DProps {
   onSelectHoardItem: (item: HoardedItem) => void;
 }
 
-function smin(a: number, b: number, k: number): number {
-  const h = Math.max(k - Math.abs(a - b), 0.0) / k;
-  return Math.min(a, b) - h * h * k * 0.25;
-}
-
-function sdSphere(
-  px: number,
-  py: number,
-  pz: number,
-  cx: number,
-  cy: number,
-  cz: number,
-  r: number
-): number {
-  return Math.hypot(px - cx, py - cy, pz - cz) - r;
-}
-
+// Grounded surface heights: white paw rug top = -1.276, sofa cushion top at (-0.88, -1.24) = -0.738
 const TREASURE_SPOTS: [number, number, number][] = [
-  [0.08, -1.31, 1.02], // Front-edge of paw rug (cleanly below Kanshan's feet!)
-  [0.58, -1.27, 0.72], // Right-front paw rug (cleanly below 2-button dock!)
-  [-0.78, -0.90, -1.08], // Inner shell sofa cushion (centered between 2D button & glasses!)
+  [-0.08, -1.274, 0.88], // Foreground rug (cleanly in front of standing boots!)
+  [0.64, -1.274, 0.66], // Right-front rug (cleanly to the right of standing Kanshan!)
+  [-0.88, -0.738, -1.24], // Sofa cushion top (strictly above cushion surface — zero sinking!)
 ];
 
 export default function KanShanStage3D({
@@ -81,8 +66,10 @@ export default function KanShanStage3D({
     ambientSnowTime: 0,
     sb2Scale: 0,
     sb3Scale: 0,
+    userRotatedTimer: 0,
   });
-  const rotYRef = useRef(-0.08);
+  // Default 3/4 angle showing off the iconic upturned fox snout & round white tail (like Photos 3 & 4!)
+  const rotYRef = useRef(0.32);
   const rebuildTreasuresRef = useRef<((items: HoardedItem[]) => void) | null>(null);
 
   useEffect(() => {
@@ -91,16 +78,15 @@ export default function KanShanStage3D({
 
   useEffect(() => {
     petRef.current = pet;
-    springRef.current.sx = 1.06;
-    springRef.current.sy = 0.94;
-    springRef.current.sz = 1.06;
-    springRef.current.jumpY = 0.08;
+    springRef.current.sx = 1.05;
+    springRef.current.sy = 0.95;
+    springRef.current.sz = 1.05;
+    springRef.current.jumpY = 0.07;
   }, [pet.equippedItems, pet.mood]);
 
   useEffect(() => {
     petRef.current = pet;
     springRef.current.patBoost = 2.8;
-    // If snowball was just reset after publishing (< 20), restart ambient stacking from 1 ball!
     if ((pet.snowballProgress || 20) <= 18) {
       springRef.current.ambientSnowTime = 0;
     }
@@ -112,15 +98,15 @@ export default function KanShanStage3D({
 
   useEffect(() => {
     hoardRef.current = hoardedItems;
-    springRef.current.treasureScale = 0.05; // Pop-in animation when treasures refresh!
+    springRef.current.treasureScale = 0.05;
     rebuildTreasuresRef.current?.(hoardedItems);
   }, [hoardedItems]);
 
   useEffect(() => {
     huntingRef.current = isHuntingTreasure;
     if (isHuntingTreasure) {
-      springRef.current.jumpY = 0.28;
-      springRef.current.waveTimer = 1.2;
+      springRef.current.jumpY = 0.26;
+      springRef.current.waveTimer = 1.4;
     }
   }, [isHuntingTreasure]);
 
@@ -143,65 +129,76 @@ export default function KanShanStage3D({
       const aspect = w / h;
       camera.aspect = aspect;
       const extraZ = aspect < 0.72 ? (0.72 - aspect) * 7.5 : 0;
-      camera.position.set(0, 0.52, 9.8 + extraZ);
-      camera.lookAt(0, -0.38, 0);
+      camera.position.set(0, 0.18, 7.35 + extraZ);
+      camera.lookAt(0, -0.44, 0);
       camera.updateProjectionMatrix();
       renderer.setSize(w, h, false);
     };
 
-    const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+    const renderer = new THREE.WebGLRenderer({
+      antialias: true,
+      alpha: true,
+      powerPreference: "high-performance",
+    });
     renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-    renderer.domElement.style.width = "100%";
-    renderer.domElement.style.height = "100%";
-    renderer.domElement.style.display = "block";
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+    renderer.outputColorSpace = THREE.SRGBColorSpace;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.06;
+    renderer.toneMappingExposure = 1.07;
+
     syncCameraAndSize(width, height);
 
     container.innerHTML = "";
+    renderer.domElement.style.width = "100%";
+    renderer.domElement.style.height = "100%";
+    renderer.domElement.style.display = "block";
     container.appendChild(renderer.domElement);
 
     // =========================================================
-    // DREAMY BLIND-BOX STUDIO LIGHTING
+    // SOFT PASTEL STUDIO LIGHTING
     // =========================================================
-    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xd4e6fb, 1.65);
-    scene.add(hemiLight);
+    scene.add(new THREE.AmbientLight(0xf6faff, 1.48));
+    scene.add(new THREE.HemisphereLight(0xffffff, 0xcbe0f8, 0.92));
 
-    const keyLight = new THREE.DirectionalLight(0xfffefa, 1.05);
-    keyLight.position.set(-2.6, 6.2, 5.6);
-    keyLight.castShadow = true;
-    keyLight.shadow.mapSize.width = 1024;
-    keyLight.shadow.mapSize.height = 1024;
-    keyLight.shadow.radius = 5;
-    scene.add(keyLight);
+    const sunLight = new THREE.DirectionalLight(0xfffcf5, 0.98);
+    sunLight.position.set(2.8, 5.2, 4.6);
+    sunLight.castShadow = true;
+    sunLight.shadow.mapSize.width = 1024;
+    sunLight.shadow.mapSize.height = 1024;
+    sunLight.shadow.bias = -0.0005;
+    sunLight.shadow.radius = 6;
+    scene.add(sunLight);
 
-    const frontFill = new THREE.DirectionalLight(0xf2f8ff, 0.48);
-    frontFill.position.set(1.8, 0.8, 5.5);
-    scene.add(frontFill);
+    const rimLight = new THREE.DirectionalLight(0xdbeafe, 0.58);
+    rimLight.position.set(-3.2, 2.2, -2.5);
+    scene.add(rimLight);
 
     // =========================================================
-    // 1. ARCTIC ROOM PROPS: SHELL SOFA + PLUSH PAW RUG + ICE GLOW
+    // 1. ARCTIC ICE ROOM ENVIRONMENT
     // =========================================================
     const roomGroup = new THREE.Group();
     scene.add(roomGroup);
 
-    const floorShadow = new THREE.Mesh(
-      new THREE.PlaneGeometry(24, 24),
-      new THREE.ShadowMaterial({ opacity: 0.12 })
+    const floorMesh = new THREE.Mesh(
+      new THREE.CylinderGeometry(8.5, 8.5, 0.3, 64),
+      new THREE.MeshStandardMaterial({
+        color: 0xcbe2fa,
+        roughness: 0.82,
+        metalness: 0.02,
+      })
     );
-    floorShadow.rotation.x = -Math.PI / 2;
-    floorShadow.position.y = -1.38;
-    floorShadow.receiveShadow = true;
-    roomGroup.add(floorShadow);
+    floorMesh.position.set(0, -1.53, -0.5);
+    floorMesh.receiveShadow = true;
+    roomGroup.add(floorMesh);
 
     const iceSheen = new THREE.Mesh(
-      new THREE.CircleGeometry(1.15, 36),
-      new THREE.MeshBasicMaterial({
-        color: 0xffffff,
+      new THREE.CircleGeometry(3.4, 48),
+      new THREE.MeshStandardMaterial({
+        color: 0xe6f2fe,
+        roughness: 0.65,
         transparent: true,
-        opacity: 0.24,
+        opacity: 0.65,
       })
     );
     iceSheen.rotation.x = -Math.PI / 2;
@@ -241,7 +238,7 @@ export default function KanShanStage3D({
     });
     roomGroup.add(sofaGroup);
 
-    // Thick Puffy Blue & White Paw Rug
+    // Thick Puffy Blue & White Paw Rug (Top surface at Y = -1.278)
     const pawRug = new THREE.Group();
     pawRug.position.set(0, -1.37, 0.12);
     const rugBlue = new THREE.MeshStandardMaterial({ color: 0x8bc0f7, roughness: 0.95 });
@@ -277,7 +274,7 @@ export default function KanShanStage3D({
     roomGroup.add(pawRug);
 
     // =========================================================
-    // 1.5 SPARKLING SCATTERED ROOM TREASURES (Directly Clickable!)
+    // 1.5 SUBTLE GROUNDED ROOM TREASURES (Directly Clickable!)
     // =========================================================
     const treasuresGroup = new THREE.Group();
     roomGroup.add(treasuresGroup);
@@ -306,231 +303,158 @@ export default function KanShanStage3D({
     rebuildTreasures(hoardRef.current);
 
     // =========================================================
-    // 2. SITTING MARSHMALLOW LIU KANSHAN (PETITE COZY BLIND-BOX SCALE!)
+    // 2. BIGGER PROGRESSIVE 1 -> 2 -> 3 SNOWBALLS ON RUG!
     // =========================================================
-    const charRoot = new THREE.Group();
-    charRoot.position.set(0, -0.79, 0.22);
-    scene.add(charRoot);
+    const snowStack = new THREE.Group();
+    snowStack.position.set(-0.56, -1.276, 0.28);
+    roomGroup.add(snowStack);
 
-    const S = 1.02;
-    const K = S / 1.46;
+    const snowMat = new THREE.MeshStandardMaterial({
+      color: 0xffffff,
+      roughness: 0.88,
+      emissive: 0xf0f7ff,
+      emissiveIntensity: 0.14,
+    });
+    const pupilMat = new THREE.MeshStandardMaterial({
+      color: 0x181d26,
+      roughness: 0.32,
+      metalness: 0.04,
+    });
+
+    // Ball 1: Generous plump base snowball (starts as 1 single snowball!)
+    const sb1 = new THREE.Mesh(new THREE.SphereGeometry(0.195, 28, 24), snowMat);
+    sb1.scale.set(1.08, 0.9, 1.08);
+    sb1.position.set(0, 0.165, 0);
+    sb1.castShadow = true;
+    sb1.receiveShadow = true;
+    sb1.name = "snowman";
+
+    // Ball 2: Plump middle snowball
+    const sb2 = new THREE.Mesh(new THREE.SphereGeometry(0.152, 26, 22), snowMat);
+    sb2.position.set(0, 0.425, 0);
+    sb2.castShadow = true;
+    sb2.visible = false;
+    sb2.name = "snowman";
+
+    // Ball 3: Top head snowball with pebble eyes
+    const sb3Group = new THREE.Group();
+    sb3Group.position.set(0, 0.645, 0);
+    sb3Group.visible = false;
+
+    const sb3 = new THREE.Mesh(new THREE.SphereGeometry(0.118, 24, 20), snowMat);
+    sb3.castShadow = true;
+    sb3.name = "snowman";
+    sb3Group.add(sb3);
+
+    [-1, 1].forEach((side) => {
+      const pebbleEye = new THREE.Mesh(new THREE.SphereGeometry(0.016, 12, 12), pupilMat);
+      pebbleEye.position.set(side * 0.038, 0.014, 0.112);
+      sb3Group.add(pebbleEye);
+    });
+
+    snowStack.add(sb1, sb2, sb3Group);
+
+    // =========================================================
+    // 3. PHOTO-ACCURATE STANDING LIU KANSHAN (Photos 1–4!)
+    // =========================================================
+    const S = 0.86;
+    const baseCharX = 0.11;
+    // Boot sole is at local y = (-0.455 - 0.285 - 0.056) * S = -0.796 * S; rug top is -1.276!
+    const baseCharY = -1.276 + 0.796 * S;
+
+    const charRoot = new THREE.Group();
+    charRoot.position.set(baseCharX, baseCharY, 0.20);
+    charRoot.rotation.y = rotYRef.current;
+    scene.add(charRoot);
 
     const kanshanRig = new THREE.Group();
     charRoot.add(kanshanRig);
 
     const vinylWhiteMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      roughness: 0.72,
+      roughness: 0.74,
       metalness: 0.0,
       emissive: 0xf4f8ff,
-      emissiveIntensity: 0.11,
+      emissiveIntensity: 0.1,
     });
-    const velvetSlateMat = new THREE.MeshStandardMaterial({
-      color: 0x354054,
-      roughness: 0.68,
-      metalness: 0.02,
-    });
-    const noseRubberMat = new THREE.MeshStandardMaterial({
-      color: 0x343f53,
+    // Rich velvety charcoal-black matching Photos 1–4!
+    const charcoalLimbMat = new THREE.MeshStandardMaterial({
+      color: 0x20252f,
       roughness: 0.62,
       metalness: 0.03,
     });
-    const pupilMat = new THREE.MeshStandardMaterial({
-      color: 0x1e2532,
-      roughness: 0.45,
-      metalness: 0.02,
+    const noseCapMat = new THREE.MeshStandardMaterial({
+      color: 0x1b2029,
+      roughness: 0.48,
+      metalness: 0.04,
     });
 
-    const whiteBodyMesh = buildSmoothSDFMesh(76, vinylWhiteMat, (x, y, z) => {
-      const dBody = evalCartoonKanshanSDF(x, y, z);
-      const dTail = sdSphere(x, y, z, 0, -0.32, -0.44, 0.148);
-      return smin(dBody, dTail, 0.048);
-    });
+    // Standing Pear-Capsule Body + Upright Ears + Bold Upturned Conical Snout
+    const whiteBodyMesh = buildSmoothSDFMesh(76, vinylWhiteMat, evalCartoonKanshanSDF);
     whiteBodyMesh.scale.setScalar(S);
     whiteBodyMesh.castShadow = true;
     whiteBodyMesh.receiveShadow = true;
     whiteBodyMesh.name = "head";
     kanshanRig.add(whiteBodyMesh);
 
-    [-1, 1].forEach((side) => {
-      const foot = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.145 * K, 0.16 * K, 18, 24),
-        vinylWhiteMat
-      );
-      foot.rotation.x = Math.PI / 2;
-      foot.scale.set(0.96, 1.0, 0.88);
-      foot.position.set(side * 0.28 * K, -0.56 * K, 0.48 * K);
-      foot.castShadow = true;
-      foot.receiveShadow = true;
-      kanshanRig.add(foot);
-    });
+    // Wagging Plump Round White Pom-Pom Tail at lower back (Photos 1, 3, 4!)
+    const tailPivot = new THREE.Group();
+    tailPivot.position.set(0, -0.27 * S, -0.28 * S);
+    const tailBall = new THREE.Mesh(new THREE.SphereGeometry(0.155 * S, 28, 24), vinylWhiteMat);
+    tailBall.position.set(0, 0, -0.11 * S);
+    tailBall.castShadow = true;
+    tailPivot.add(tailBall);
+    kanshanRig.add(tailPivot);
 
-    const blackNoseMesh = new THREE.Mesh(
-      new THREE.SphereGeometry(1, 48, 36),
-      noseRubberMat
-    );
-    blackNoseMesh.scale.set(0.165 * S, 0.145 * S, 0.132 * S);
-    blackNoseMesh.position.set(0, 0.185 * S, 0.435 * S);
+    // Seamless Dipped Charcoal-Black Nose Cap wrapping the upturned snout tip (Photos 1–4!)
+    const blackNoseMesh = new THREE.Mesh(new THREE.SphereGeometry(1, 48, 36), noseCapMat);
+    blackNoseMesh.scale.set(0.146 * S, 0.142 * S, 0.136 * S);
+    blackNoseMesh.position.set(0, 0.318 * S, 0.495 * S);
+    blackNoseMesh.rotation.x = -0.18;
     blackNoseMesh.castShadow = true;
     blackNoseMesh.name = "nose";
     kanshanRig.add(blackNoseMesh);
 
-    const eyeX = 0.242;
-    const eyeY = 0.238;
+    // Crisp Vertical-Oval Glossy Bead Eyes beside the snout root (Photos 1–4!)
+    const eyeX = 0.186;
+    const eyeY = 0.338;
     const eyeZ = findFaceSurfaceZ(eyeX, eyeY);
 
     const beadEyesGroup = new THREE.Group();
-    const createDeadpanDotEye = (side: number) => {
-      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.024 * S, 20, 20), pupilMat);
-      dot.scale.set(0.92, 1.18, 0.7);
+    const createOvalBeadEye = (side: number) => {
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.025 * S, 20, 20), pupilMat);
+      dot.scale.set(0.88, 1.24, 0.72);
       dot.position.set(side * eyeX * S, eyeY * S, (eyeZ + 0.008) * S);
-      dot.rotation.y = side * 0.22;
+      dot.rotation.y = side * 0.38;
       return dot;
     };
-    const leftEye = createDeadpanDotEye(-1);
-    const rightEye = createDeadpanDotEye(1);
+    const leftEye = createOvalBeadEye(-1);
+    const rightEye = createOvalBeadEye(1);
     beadEyesGroup.add(leftEye, rightEye);
     kanshanRig.add(beadEyesGroup);
 
     const happyEyesGroup = new THREE.Group();
-    const arcGeo = new THREE.TorusGeometry(0.038 * S, 0.011 * S, 12, 24, Math.PI * 0.85);
+    const arcGeo = new THREE.TorusGeometry(0.032 * S, 0.010 * S, 12, 24, Math.PI * 0.85);
     [-1, 1].forEach((side) => {
       const smile = new THREE.Mesh(arcGeo, pupilMat);
-      smile.position.set(side * eyeX * S, (eyeY - 0.006) * S, (eyeZ + 0.012) * S);
-      smile.rotation.set(0.05, side * 0.22, Math.PI * 0.08);
+      smile.position.set(side * eyeX * S, (eyeY - 0.004) * S, (eyeZ + 0.012) * S);
+      smile.rotation.set(0.04, side * 0.38, Math.PI * 0.08);
       happyEyesGroup.add(smile);
     });
     happyEyesGroup.visible = false;
     kanshanRig.add(happyEyesGroup);
 
-    const armY = -0.06;
-    const armZ = 0.04;
-    const shoulderSurfX = findSurfaceX(armY, armZ);
-
-    const createTeardropArm = (side: number) => {
-      const pivot = new THREE.Group();
-      pivot.position.set(side * (shoulderSurfX - 0.045) * S, armY * S, armZ * S);
-
-      // Seamless spherical shoulder joint tucked inside torso so no tube cap ever pokes out!
-      const shoulderCap = new THREE.Mesh(
-        new THREE.SphereGeometry(0.052 * K, 16, 16),
-        velvetSlateMat
-      );
-      pivot.add(shoulderCap);
-
-      const armCurve = new THREE.CatmullRomCurve3([
-        new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(side * 0.12 * K, -0.22 * K, 0.05 * K),
-        new THREE.Vector3(side * 0.14 * K, -0.46 * K, 0.12 * K),
-      ]);
-
-      const tubularSegs = 24;
-      const radialSegs = 18;
-      const frames = armCurve.computeFrenetFrames(tubularSegs, false);
-      const pos: number[] = [];
-      const idx: number[] = [];
-
-      for (let i = 0; i <= tubularSegs; i++) {
-        const u = i / tubularSegs;
-        const p = armCurve.getPointAt(u);
-        const N = frames.normals[i];
-        const B = frames.binormals[i];
-        const r = (0.048 + u * 0.028) * K;
-        for (let j = 0; j <= radialSegs; j++) {
-          const v = (j / radialSegs) * Math.PI * 2;
-          const sin = Math.sin(v);
-          const cos = -Math.cos(v);
-          pos.push(
-            p.x + r * (cos * N.x + sin * B.x),
-            p.y + r * (cos * N.y + sin * B.y),
-            p.z + r * (cos * N.z + sin * B.z)
-          );
-        }
-      }
-      for (let i = 0; i < tubularSegs; i++) {
-        for (let j = 0; j < radialSegs; j++) {
-          const a = i * (radialSegs + 1) + j;
-          const b = (i + 1) * (radialSegs + 1) + j;
-          const c = (i + 1) * (radialSegs + 1) + (j + 1);
-          const d = i * (radialSegs + 1) + (j + 1);
-          idx.push(a, b, d, b, c, d);
-        }
-      }
-      const taperedGeo = new THREE.BufferGeometry();
-      taperedGeo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-      taperedGeo.setIndex(idx);
-      taperedGeo.computeVertexNormals();
-
-      const armMesh = new THREE.Mesh(taperedGeo, velvetSlateMat);
-      armMesh.castShadow = true;
-
-      const pawEnd = new THREE.Mesh(new THREE.SphereGeometry(0.076 * K, 20, 20), velvetSlateMat);
-      pawEnd.scale.set(0.95, 1.08, 0.95);
-      pawEnd.position.set(side * 0.14 * K, -0.46 * K, 0.12 * K);
-      pawEnd.castShadow = true;
-
-      const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.034 * K, 14, 14), velvetSlateMat);
-      thumb.scale.set(1.2, 0.85, 0.9);
-      thumb.position.set(side * 0.085 * K, -0.44 * K, 0.165 * K);
-
-      pivot.add(armMesh, pawEnd, thumb);
-      return pivot;
-    };
-
-    const leftArm = createTeardropArm(-1);
-    const rightArm = createTeardropArm(1);
+    // Slender Charcoal-Black Arms with 4-Fingered Hands + Sturdy Standing Legs with Boots!
+    const leftArm = buildFourFingeredArm(-1, S, charcoalLimbMat);
+    const rightArm = buildFourFingeredArm(1, S, charcoalLimbMat);
     kanshanRig.add(leftArm, rightArm);
 
-    // =========================================================
-    // 3. PROGRESSIVE 1 -> 2 -> 3 SNOWBALL STACK ("一开始只有一个雪球然后慢慢堆起来")
-    // =========================================================
-    const snowStack = new THREE.Group();
-    snowStack.position.set(-0.82 * K, -0.68 * K, 0.42 * K);
-    const snowMat = new THREE.MeshStandardMaterial({
-      color: 0xffffff,
-      roughness: 0.9,
-      emissive: 0xf0f7ff,
-      emissiveIntensity: 0.14,
-    });
-
-    // Ball 1: Always starts as a single plump snowball on the rug!
-    const sb1 = new THREE.Mesh(new THREE.SphereGeometry(0.172 * K, 24, 24), snowMat);
-    sb1.scale.set(1.08, 0.9, 1.08);
-    sb1.position.set(0, 0.14 * K, 0);
-    sb1.castShadow = true;
-    sb1.name = "snowman";
-
-    // Ball 2: Stacked onto Ball 1 gradually as Kanshan pats!
-    const sb2 = new THREE.Mesh(new THREE.SphereGeometry(0.134 * K, 24, 24), snowMat);
-    sb2.position.set(0, 0.355 * K, 0);
-    sb2.castShadow = true;
-    sb2.visible = false;
-    sb2.name = "snowman";
-
-    // Ball 3: Top head ball with cute pebble eyes, stacked last!
-    const sb3Group = new THREE.Group();
-    sb3Group.position.set(0, 0.525 * K, 0);
-    sb3Group.visible = false;
-
-    const sb3 = new THREE.Mesh(new THREE.SphereGeometry(0.104 * K, 24, 24), snowMat);
-    sb3.castShadow = true;
-    sb3.name = "snowman";
-    sb3Group.add(sb3);
-
-    [-1, 1].forEach((side) => {
-      const pebbleEye = new THREE.Mesh(
-        new THREE.SphereGeometry(0.015 * K, 12, 12),
-        pupilMat
-      );
-      pebbleEye.position.set(side * 0.036 * K, 0.012 * K, 0.098 * K);
-      sb3Group.add(pebbleEye);
-    });
-
-    snowStack.add(sb1, sb2, sb3Group);
-    kanshanRig.add(snowStack);
+    const leftLeg = buildStandingLeg(-1, S, charcoalLimbMat);
+    const rightLeg = buildStandingLeg(1, S, charcoalLimbMat);
+    kanshanRig.add(leftLeg, rightLeg);
 
     // =========================================================
-    // 4. DESIGNER-TOY SCULPTED ACCESSORIES
+    // 4. FITTED OPTIONAL ACCESSORIES (Wardrobe)
     // =========================================================
     const glassesGroup = buildDetailedGlasses(S, eyeY);
     kanshanRig.add(glassesGroup);
@@ -545,10 +469,10 @@ export default function KanShanStage3D({
     kanshanRig.add(muffsGroup);
 
     const fishGroup = buildCuteCodfish();
-    fishGroup.scale.setScalar(K);
-    fishGroup.position.set(0.76 * K, -0.44 * K, 0.28 * K);
+    fishGroup.scale.setScalar(0.72 * S);
+    fishGroup.position.set(0.06 * S, -0.35 * S, 0.09 * S);
     fishGroup.rotation.z = -0.35;
-    kanshanRig.add(fishGroup);
+    rightArm.add(fishGroup);
 
     // =========================================================
     // 5. RAYCASTER & SMOOTH 360° TURNTABLE DRAG
@@ -574,7 +498,6 @@ export default function KanShanStage3D({
       pointer.y = -((cy - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
 
-      // Prioritize clicking sparkling room treasures!
       const treasureHits = raycaster.intersectObjects(treasureHitMeshes, false);
       if (treasureHits.length > 0) return treasureHits[0].object.name;
 
@@ -598,8 +521,8 @@ export default function KanShanStage3D({
       if (hit === "nose") {
         noseHoldTimer = setTimeout(() => {
           dragging = false;
-          springRef.current.sx = 1.05;
-          springRef.current.sy = 0.95;
+          springRef.current.sx = 1.04;
+          springRef.current.sy = 0.96;
           onTapNoseStart();
         }, 220);
       }
@@ -614,7 +537,10 @@ export default function KanShanStage3D({
       if (!dragging) return;
       const dx = e.clientX - prevX;
       prevX = e.clientX;
-      rotYRef.current += dx * 0.011;
+      if (Math.abs(dx) > 0.5) {
+        rotYRef.current += dx * 0.012;
+        springRef.current.userRotatedTimer = 5.0;
+      }
     };
 
     const onUp = (e: PointerEvent) => {
@@ -634,10 +560,10 @@ export default function KanShanStage3D({
         } else if (hit === "snowman") {
           onTapSnowman();
         } else if (hit === "head" || hit === "nose") {
-          springRef.current.sx = 1.08;
-          springRef.current.sy = 0.91;
-          springRef.current.jumpY = 0.1;
-          springRef.current.waveTimer = 1.2;
+          springRef.current.sx = 1.07;
+          springRef.current.sy = 0.93;
+          springRef.current.jumpY = 0.11;
+          springRef.current.waveTimer = 1.8;
           onTapHead();
         }
       }
@@ -657,6 +583,9 @@ export default function KanShanStage3D({
     });
     resizeObserver.observe(container);
 
+    // =========================================================
+    // 6. RICH 5-BEHAVIOR IDLE CHOREOGRAPHER + PROGRESSIVE SNOWBALLS
+    // =========================================================
     let raf = 0;
     const clock = new THREE.Clock();
 
@@ -670,7 +599,10 @@ export default function KanShanStage3D({
 
       const sp = springRef.current;
       if (sp.patBoost > 0) sp.patBoost = Math.max(0, sp.patBoost - dt);
-      // Gradually accumulate snow progress over time (~10s for 2nd ball, ~22s for 3rd ball!)
+      if (sp.waveTimer > 0) sp.waveTimer = Math.max(0, sp.waveTimer - dt);
+      if (sp.userRotatedTimer > 0) sp.userRotatedTimer = Math.max(0, sp.userRotatedTimer - dt);
+
+      // Progressive 1 -> 2 -> 3 snowball build-up (~10s for 2nd ball, ~21s for 3rd ball!)
       sp.ambientSnowTime = Math.min(30, sp.ambientSnowTime + dt);
       const effectiveSnow = Math.min(
         100,
@@ -681,20 +613,20 @@ export default function KanShanStage3D({
       sp.treasureScale += (1 - sp.treasureScale) * 0.12;
       treasuresGroup.scale.setScalar(sp.treasureScale);
 
-      // Animate Sparkling Room Treasures (Levitating + Pulsing Halo + Twinkling 4-Point Stars!)
+      // Animate Subtle Grounded Room Treasures
       activePods.forEach((pod, idx) => {
-        const phase = t * 2.6 + idx * 2.1;
-        pod.propGroup.position.y = 0.22 + Math.sin(phase) * 0.045;
-        pod.propGroup.rotation.y = Math.sin(t * 1.1 + idx) * 0.35;
+        const phase = t * 2.1 + idx * 2.1;
+        pod.propGroup.position.y = 0.01 + (Math.sin(phase) + 1) * 0.006;
+        pod.propGroup.rotation.y = Math.sin(t * 0.8 + idx) * 0.2;
 
-        const haloPulse = 0.92 + Math.sin(phase * 1.3) * 0.16;
+        const haloPulse = 0.94 + Math.sin(phase * 1.1) * 0.07;
         pod.haloMesh.scale.set(haloPulse, haloPulse, 1);
 
         pod.stars.forEach((star, sIdx) => {
-          const spPhase = t * 5.2 + idx * 1.7 + sIdx * 2.1;
-          const twinkle = Math.max(0.15, (Math.sin(spPhase) + 1) * 0.58);
+          const spPhase = t * 3.6 + idx * 1.7 + sIdx * 2.1;
+          const twinkle = Math.max(0.2, (Math.sin(spPhase) + 1) * 0.42);
           star.scale.setScalar(twinkle);
-          star.rotation.z = t * 1.2 + sIdx;
+          star.rotation.z = t * 0.9 + sIdx;
           star.lookAt(camera.position);
         });
       });
@@ -706,57 +638,150 @@ export default function KanShanStage3D({
       fishGroup.visible = eq.includes("codfish_plush");
       muffsGroup.visible = eq.includes("ear_muffs");
 
-      if (sp.waveTimer > 0) sp.waveTimer = Math.max(0, sp.waveTimer - dt);
+      // ---------------------------------------------------------
+      // 5-State Seamless Idle Choreographer (22-second loop):
+      // [0.0..4.2s]  State A: Patting & shaping snowball beside him
+      // [4.2..8.6s]  State B: Iconic 3/4 Sunset Pose + Snout Sniff & Tail Wag (Photo 3!)
+      // [8.6..13.0s] State C: Happy Foot-Tap Step & Hip Sway (Photos 1 & 2!)
+      // [13.0..17.2s] State D: Patting growing 2nd/3rd snowball
+      // [17.2..22.0s] State E: Curious Head-Tilt + 4-Finger Hand Wave Hello (Photo 4!)
+      // ---------------------------------------------------------
+      const phase22 = t % 22.0;
+      const isPatState =
+        !hunting &&
+        sp.waveTimer <= 0 &&
+        (sp.patBoost > 0 || phase22 < 4.2 || (phase22 >= 13.0 && phase22 < 17.2));
+      const isSniffState =
+        !hunting && sp.waveTimer <= 0 && !isPatState && phase22 >= 4.2 && phase22 < 8.6;
+      const isStepDanceState =
+        !hunting && sp.waveTimer <= 0 && !isPatState && phase22 >= 8.6 && phase22 < 13.0;
+      const isIdleWaveState =
+        !hunting && sp.waveTimer <= 0 && !isPatState && phase22 >= 17.2;
 
-      // Autonomous Snowball Stacking Cycle ("他自己在那堆")
-      const autoPatWindow = (t % 6.4) < 2.7 || sp.patBoost > 0;
-      sp.armLerp += ((autoPatWindow && !hunting ? 1 : 0) - sp.armLerp) * 0.12;
-      const patWave = Math.max(0, Math.sin(t * 8.6)) * sp.armLerp;
+      // Gently steer body orientation during idle (unless user dragged turntable recently!)
+      if (!dragging && sp.userRotatedTimer <= 0) {
+        const targetIdleYaw = isPatState
+          ? -0.22
+          : isSniffState
+          ? 0.42
+          : isStepDanceState
+          ? 0.24 + Math.sin(t * 3.2) * 0.14
+          : 0.30;
+        // Smooth shortest-angle blend so 360° user spins don't unwind abruptly
+        const diff =
+          ((targetIdleYaw - rotYRef.current + Math.PI * 3) % (Math.PI * 2)) - Math.PI;
+        rotYRef.current += diff * 0.04;
+      }
 
-      const isSmiling = hunting || curPet.mood === "happy" || sp.waveTimer > 0 || sp.armLerp > 0.65;
+      sp.armLerp += ((isPatState ? 1 : 0) - sp.armLerp) * 0.12;
+      const patWave = Math.max(0, Math.sin(t * 8.2)) * sp.armLerp;
+
+      const isSmiling =
+        hunting ||
+        curPet.mood === "happy" ||
+        sp.waveTimer > 0 ||
+        isStepDanceState ||
+        sp.armLerp > 0.7;
       happyEyesGroup.visible = isSmiling;
       beadEyesGroup.visible = !isSmiling;
       if (!isSmiling) {
-        const blink = (t % 3.8) > 3.64;
-        leftEye.scale.set(0.92, blink ? 0.15 : 1.18, 0.7);
-        rightEye.scale.set(0.92, blink ? 0.15 : 1.18, 0.7);
+        // Occasional natural double-blink!
+        const blinkCycle = t % 4.2;
+        const blink =
+          (blinkCycle > 3.7 && blinkCycle < 3.84) ||
+          (isSniffState && blinkCycle > 3.92 && blinkCycle < 4.05);
+        leftEye.scale.set(0.88, blink ? 0.14 : 1.24, 0.72);
+        rightEye.scale.set(0.88, blink ? 0.14 : 1.24, 0.72);
       }
 
-      const baseArmX = (shoulderSurfX - 0.045) * S;
-      // Keep shoulder pivot strictly anchored inside torso (ZERO floating shoulder stub!)
-      leftArm.position.set(-baseArmX, armY * S, armZ * S);
+      // ---------------------------------------------------------
+      // ARMS: Patting Snowball (strictly outside snow X!) / Waving (Photo 4!) / Step Swing
+      // ---------------------------------------------------------
+      const activeWave = sp.waveTimer > 0 || isIdleWaveState;
 
-      // Target non-clipping angles tailored to current snowball height (pats outer right cheek only!)
-      const targetRotX = snowTier === 1 ? -0.42 : snowTier === 2 ? -0.68 : -0.92;
-      const targetRotZ = snowTier === 1 ? -0.05 : snowTier === 2 ? -0.09 : -0.12;
+      if (hunting) {
+        // Joyful running arms spread wide like Photo 2!
+        leftArm.rotation.set(-0.4, 0, -1.85 + Math.sin(t * 14) * 0.25);
+        rightArm.rotation.set(-0.4, 0, 1.85 - Math.sin(t * 14) * 0.25);
+      } else if (activeWave) {
+        // Photo 4 Friendly 4-Finger Hand Wave!
+        leftArm.rotation.x = -0.25;
+        leftArm.rotation.y = 0.15;
+        leftArm.rotation.z = -2.28 + Math.sin(t * 11) * 0.24;
 
-      leftArm.rotation.x = sp.armLerp * (targetRotX - patWave * 0.09);
-      leftArm.rotation.y = -sp.armLerp * 0.08;
-      leftArm.rotation.z =
-        sp.armLerp * (targetRotZ - patWave * 0.035) +
-        (1 - sp.armLerp) * Math.sin(t * 1.8) * 0.025;
-
-      // Right arm stays relaxed inside shoulder or waves happily when patted
-      rightArm.position.set(baseArmX, armY * S, armZ * S);
-      if (sp.waveTimer > 0) {
-        rightArm.rotation.z = -2.1 + Math.sin(t * 16) * 0.28;
-        rightArm.rotation.x = -0.3;
+        rightArm.rotation.x = Math.sin(t * 2.0) * 0.05;
         rightArm.rotation.y = 0;
+        rightArm.rotation.z = -0.06 - Math.sin(t * 1.8) * 0.03;
+      } else if (isStepDanceState) {
+        // Playful alternating arm swing like Photo 1!
+        const swing = Math.sin(t * 6.4);
+        leftArm.rotation.set(swing * 0.42, 0, -0.14);
+        rightArm.rotation.set(-swing * 0.42, 0, 0.14);
       } else {
-        rightArm.rotation.x = 0;
+        // Snowball patting on left arm (stays strictly to the right of snow X <= -0.368 — ZERO overlap!)
+        const targetRotX = snowTier === 1 ? -0.18 : snowTier === 2 ? -0.32 : -0.46;
+        const targetRotZ = snowTier === 1 ? -0.26 : snowTier === 2 ? -0.32 : -0.36;
+        leftArm.rotation.x =
+          sp.armLerp * (targetRotX - patWave * 0.07) +
+          (1 - sp.armLerp) * Math.sin(t * 1.9) * 0.04;
+        leftArm.rotation.y = 0;
+        leftArm.rotation.z =
+          sp.armLerp * (targetRotZ - patWave * 0.04) +
+          (1 - sp.armLerp) * (-0.05 + Math.sin(t * 1.8) * 0.025);
+
+        rightArm.rotation.x = -Math.sin(t * 1.9) * 0.04;
         rightArm.rotation.y = 0;
-        rightArm.rotation.z = -Math.sin(t * 1.8) * 0.025;
+        rightArm.rotation.z = 0.05 - Math.sin(t * 1.8) * 0.025;
       }
 
-      // Smoothly grow Ball 1 -> Ball 2 -> Ball 3 and gently squish whichever ball is on top!
+      // ---------------------------------------------------------
+      // STANDING LEGS & BOOTS: Happy Foot-Tap / Running / Subtle Weight Shift
+      // ---------------------------------------------------------
+      let stepBobY = 0;
+      let swayX = 0;
+      if (hunting) {
+        const run = Math.sin(t * 15);
+        leftLeg.rotation.x = run * 0.65;
+        rightLeg.rotation.x = -run * 0.65;
+        stepBobY = Math.abs(Math.cos(t * 15)) * 0.14;
+      } else if (isStepDanceState) {
+        const step = Math.sin(t * 6.4);
+        leftLeg.rotation.x = Math.max(0, step) * 0.34 - Math.max(0, -step) * 0.1;
+        rightLeg.rotation.x = Math.max(0, -step) * 0.34 - Math.max(0, step) * 0.1;
+        leftLeg.rotation.z = -0.03;
+        rightLeg.rotation.z = 0.03;
+        stepBobY = Math.abs(step) * 0.032;
+        swayX = step * 0.028;
+      } else {
+        leftLeg.rotation.x += (0 - leftLeg.rotation.x) * 0.18;
+        rightLeg.rotation.x += (0 - rightLeg.rotation.x) * 0.18;
+        leftLeg.rotation.z += (0 - leftLeg.rotation.z) * 0.18;
+        rightLeg.rotation.z += (0 - rightLeg.rotation.z) * 0.18;
+      }
+
+      // ---------------------------------------------------------
+      // WAGGING POM-POM TAIL & SNIFFING NOSE TWITCH
+      // ---------------------------------------------------------
+      const tailSpeed = hunting || activeWave || isStepDanceState ? 11.0 : isSniffState ? 7.5 : 3.2;
+      const tailAmp = hunting || activeWave || isStepDanceState ? 0.28 : 0.14;
+      tailPivot.rotation.y = Math.sin(t * tailSpeed) * tailAmp;
+      tailPivot.rotation.x = Math.cos(t * tailSpeed * 0.5) * 0.06;
+
+      const sniffTwitch = isSniffState ? Math.max(0, Math.sin(t * 14)) * 0.06 : 0;
+      const nScale = rec ? 0.93 : 1.0 + sniffTwitch;
+      blackNoseMesh.scale.set(0.146 * S * nScale, 0.142 * S * nScale, 0.136 * S * nScale);
+
+      // ---------------------------------------------------------
+      // PROGRESSIVE 1 -> 2 -> 3 BIGGER SNOWBALL ANIMATION
+      // ---------------------------------------------------------
       sp.sb2Scale += ((snowTier >= 2 ? 1 : 0) - sp.sb2Scale) * 0.08;
       sp.sb3Scale += ((snowTier >= 3 ? 1 : 0) - sp.sb3Scale) * 0.08;
 
-      const s1Squish = snowTier === 1 ? patWave * 0.06 : 0;
+      const s1Squish = snowTier === 1 ? patWave * 0.065 : 0;
       sb1.scale.set(1.08 + s1Squish, 0.9 - s1Squish, 1.08 + s1Squish);
 
       sb2.visible = sp.sb2Scale > 0.03;
-      const s2Squish = snowTier === 2 ? patWave * 0.06 : 0;
+      const s2Squish = snowTier === 2 ? patWave * 0.065 : 0;
       sb2.scale.set(
         (1.05 + s2Squish) * sp.sb2Scale,
         (0.92 - s2Squish) * sp.sb2Scale,
@@ -764,28 +789,35 @@ export default function KanShanStage3D({
       );
 
       sb3Group.visible = sp.sb3Scale > 0.03;
-      const s3Squish = snowTier === 3 ? patWave * 0.06 : 0;
+      const s3Squish = snowTier === 3 ? patWave * 0.065 : 0;
       sb3Group.scale.set(
         (1 + s3Squish) * sp.sb3Scale,
         (1 - s3Squish) * sp.sb3Scale,
         (1 + s3Squish) * sp.sb3Scale
       );
 
-      const nScale = rec ? 0.93 : 1.0;
-      blackNoseMesh.scale.set(0.165 * S * nScale, 0.145 * S * nScale, 0.132 * S * nScale);
-
+      // ---------------------------------------------------------
+      // TORSO BREATHING, HEAD-TILT & SNOUT LOOK-UP
+      // ---------------------------------------------------------
       sp.sx += (1 - sp.sx) * 0.14;
       sp.sy += (1 - sp.sy) * 0.14;
       sp.sz += (1 - sp.sz) * 0.14;
       sp.jumpY += (0 - sp.jumpY) * 0.14;
 
-      const breath = Math.sin(t * 2.1) * 0.012;
+      const breath = Math.sin(t * 2.2) * 0.012;
       kanshanRig.scale.set(sp.sx - breath * 0.35, sp.sy + breath, sp.sz - breath * 0.35);
-      // Subtle lean toward the snowman when patting it!
-      kanshanRig.rotation.z = Math.sin(t * 1.35) * 0.018 + sp.armLerp * 0.045;
 
-      const huntHop = hunting ? Math.abs(Math.sin(t * 12)) * 0.16 : 0;
-      charRoot.position.y = -0.79 + sp.jumpY + huntHop;
+      const targetRoll = activeWave
+        ? -0.055
+        : isStepDanceState
+        ? Math.sin(t * 6.4) * 0.045
+        : Math.sin(t * 1.4) * 0.016;
+      const targetPitch = isSniffState ? -0.068 : isPatState ? 0.035 : 0;
+      kanshanRig.rotation.z += (targetRoll - kanshanRig.rotation.z) * 0.1;
+      kanshanRig.rotation.x += (targetPitch - kanshanRig.rotation.x) * 0.1;
+
+      charRoot.position.x = baseCharX + swayX;
+      charRoot.position.y = baseCharY + sp.jumpY + stepBobY;
       charRoot.rotation.y += (rotYRef.current - charRoot.rotation.y) * 0.12;
 
       renderer.render(scene, camera);

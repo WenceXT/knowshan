@@ -9,7 +9,7 @@ import {
 } from "@/lib/ai-engine";
 import { AccessoryItem, KnowShanStore, PetMood, ZhihuQuestion } from "@/types/knowshan";
 
-const STORAGE_KEY = "knowshan_store_v7";
+const STORAGE_KEY = "knowshan_store_v9";
 const IS_STATIC = process.env.NEXT_PUBLIC_STATIC_MODE === "true";
 
 function loadLocalStore(): KnowShanStore {

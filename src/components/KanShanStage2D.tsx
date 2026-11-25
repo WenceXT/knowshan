@@ -18,45 +18,45 @@ interface KanShanStage2DProps {
 function Treasure2DGlyph({ kind }: { kind: string }) {
   if (kind === "fish") {
     return (
-      <svg viewBox="0 0 44 44" className="w-11 h-11 drop-shadow-[0_0_8px_rgba(253,224,71,0.9)]">
-        <ellipse cx="19" cy="22" rx="13" ry="8.5" fill="#7dd3fc" stroke="#ffffff" strokeWidth="2" />
-        <polygon points="30,22 40,14 40,30" fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" />
-        <circle cx="13" cy="20" r="2" fill="#1e293b" />
+      <svg viewBox="0 0 44 44" className="w-9 h-9">
+        <ellipse cx="19" cy="22" rx="12" ry="7.8" fill="#7dd3fc" stroke="#ffffff" strokeWidth="2" />
+        <polygon points="30,22 39,15 39,29" fill="#38bdf8" stroke="#ffffff" strokeWidth="1.5" />
+        <circle cx="13" cy="20" r="1.8" fill="#1e293b" />
       </svg>
     );
   }
   if (kind === "card" || kind === "plane") {
     return (
-      <svg viewBox="0 0 44 44" className="w-11 h-11 drop-shadow-[0_0_8px_rgba(253,224,71,0.9)]">
+      <svg viewBox="0 0 44 44" className="w-9 h-9">
         <rect
-          x="7"
-          y="11"
-          width="30"
-          height="22"
+          x="8"
+          y="12"
+          width="28"
+          height="20"
           rx="5"
-          transform="rotate(-8 22 22)"
+          transform="rotate(-7 22 22)"
           fill="#fef3c7"
           stroke="#ffffff"
-          strokeWidth="2.2"
+          strokeWidth="2"
         />
-        <circle cx="22" cy="22" r="4.5" fill="#fb7185" />
+        <circle cx="22" cy="22" r="4" fill="#fb7185" />
       </svg>
     );
   }
   if (kind === "cocoa") {
     return (
-      <svg viewBox="0 0 44 44" className="w-11 h-11 drop-shadow-[0_0_8px_rgba(253,224,71,0.9)]">
-        <rect x="11" y="14" width="20" height="20" rx="6" fill="#fb7185" stroke="#ffffff" strokeWidth="2" />
-        <ellipse cx="21" cy="15" rx="9" ry="4" fill="#fffbeb" />
-        <path d="M31 18 A4 4 0 0 1 31 28" fill="none" stroke="#ffffff" strokeWidth="2.5" />
+      <svg viewBox="0 0 44 44" className="w-9 h-9">
+        <rect x="12" y="15" width="18" height="18" rx="5.5" fill="#fb7185" stroke="#ffffff" strokeWidth="2" />
+        <ellipse cx="21" cy="16" rx="8" ry="3.5" fill="#fffbeb" />
+        <path d="M30 18 A3.8 3.8 0 0 1 30 27" fill="none" stroke="#ffffff" strokeWidth="2.2" />
       </svg>
     );
   }
   return (
-    <svg viewBox="0 0 44 44" className="w-11 h-11 drop-shadow-[0_0_8px_rgba(253,224,71,0.95)]">
-      <rect x="12" y="11" width="20" height="24" rx="8" fill="#bae6fd" fillOpacity="0.85" stroke="#ffffff" strokeWidth="2" />
-      <rect x="16" y="7" width="12" height="5" rx="2.5" fill="#fb7185" />
-      <path d="M22 15 L24.2 20.5 L30 21 L25.5 24.8 L26.8 30.5 L22 27.4 L17.2 30.5 L18.5 24.8 L14 21 L19.8 20.5 Z" fill="#fde047" />
+    <svg viewBox="0 0 44 44" className="w-9 h-9">
+      <rect x="13" y="12" width="18" height="22" rx="7" fill="#bae6fd" fillOpacity="0.88" stroke="#ffffff" strokeWidth="2" />
+      <rect x="16.5" y="8" width="11" height="4.5" rx="2.2" fill="#fb7185" />
+      <path d="M22 16 L24 20.5 L29 21 L25 24.4 L26.2 29.2 L22 26.6 L17.8 29.2 L19 24.4 L15 21 L20 20.5 Z" fill="#fde047" />
     </svg>
   );
 }
@@ -78,6 +78,7 @@ export default function KanShanStage2D({
   const [squish, setSquish] = useState<"none" | "pat" | "nose">("none");
   const [hearts, setHearts] = useState<number[]>([]);
   const [ambientExtra, setAmbientExtra] = useState(0);
+  const [idleMode, setIdleMode] = useState<"pat" | "wave" | "sway">("pat");
   const holdTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
@@ -91,10 +92,21 @@ export default function KanShanStage2D({
     return () => clearInterval(iv);
   }, []);
 
+  // Cycle rich 2D idle states (patting snowball -> waving 4-finger hand -> happy step sway)
+  useEffect(() => {
+    const modes: ("pat" | "wave" | "sway")[] = ["pat", "wave", "sway"];
+    let idx = 0;
+    const iv = setInterval(() => {
+      idx = (idx + 1) % modes.length;
+      setIdleMode(modes[idx]);
+    }, 5200);
+    return () => clearInterval(iv);
+  }, []);
+
   useEffect(() => {
     let timeoutId: ReturnType<typeof setTimeout>;
     const scheduleBlink = () => {
-      const delay = 2800 + Math.random() * 2200;
+      const delay = 2600 + Math.random() * 2000;
       timeoutId = setTimeout(() => {
         setIsBlinking(true);
         setTimeout(() => {
@@ -161,20 +173,17 @@ export default function KanShanStage2D({
   };
 
   const eq = pet.equippedItems || [];
-  const isSmiling = isHuntingTreasure || pet.mood === "happy" || squish === "pat";
+  const isSmiling =
+    isHuntingTreasure || pet.mood === "happy" || squish === "pat" || idleMode === "sway";
   const effectiveSnow = Math.min(100, (pet.snowballProgress || 20) + ambientExtra);
   const snowTier = effectiveSnow >= 80 ? 3 : effectiveSnow >= 48 ? 2 : 1;
 
-  const faceX = look.x * 7;
-  const faceY = look.y * 4;
-  const noseX = look.x * 10;
-  const noseY = look.y * 5;
-  const earX = -look.x * 3;
+  const faceX = look.x * 5;
+  const faceY = look.y * 3;
 
-  // 3 Unobstructed Sparkling Room Positions (Foreground Rug, Right-Front Rug, Inner Sofa Cushion)
   const spotClasses = [
-    "left-[42%] bottom-[17%]",
-    "right-[11%] bottom-[20%]",
+    "left-[46%] bottom-[16%]",
+    "right-[12%] bottom-[19%]",
     "left-[20%] top-[47%]",
   ];
 
@@ -188,16 +197,24 @@ export default function KanShanStage2D({
       <style>{`
         @keyframes ks-breathe {
           0%, 100% { transform: translateY(0px) scale(1, 1); }
-          50% { transform: translateY(-3px) scale(0.992, 1.012); }
+          50% { transform: translateY(-3px) scale(0.993, 1.012); }
+        }
+        @keyframes ks-sway-dance {
+          0%, 100% { transform: rotate(-2.2deg) translateY(0px); }
+          50% { transform: rotate(2.4deg) translateY(-4px); }
         }
         @keyframes ks-tail {
-          0%, 100% { transform: rotate(-8deg); }
-          50% { transform: rotate(10deg); }
+          0%, 100% { transform: rotate(-10deg); }
+          50% { transform: rotate(12deg); }
         }
         @keyframes ks-pat-snow {
           0%, 55%, 100% { transform: rotate(0deg); }
-          15%, 35% { transform: rotate(9deg); }
+          15%, 35% { transform: rotate(10deg); }
           25% { transform: rotate(4deg); }
+        }
+        @keyframes ks-wave-hi {
+          0%, 100% { transform: rotate(118deg); }
+          50% { transform: rotate(138deg); }
         }
         @keyframes ks-snow-squish {
           0%, 55%, 100% { transform: scale(1, 1); }
@@ -209,18 +226,16 @@ export default function KanShanStage2D({
           100% { opacity: 0; transform: translateY(-42px) scale(1.15); }
         }
         @keyframes ks-treasure-bob {
-          0%, 100% { transform: translateY(0px) scale(1); }
-          50% { transform: translateY(-6px) scale(1.06); }
+          0%, 100% { transform: translateY(0px); }
+          50% { transform: translateY(-3px); }
         }
         @keyframes ks-twinkle {
-          0%, 100% { opacity: 0.35; transform: scale(0.7) rotate(0deg); }
-          50% { opacity: 1; transform: scale(1.25) rotate(20deg); }
+          0%, 100% { opacity: 0.3; transform: scale(0.7); }
+          50% { opacity: 0.95; transform: scale(1.15); }
         }
       `}</style>
 
-      {/* =============================================================== */}
-      {/* 2D STORYBOOK ARCTIC ROOM BACKGROUND                             */}
-      {/* =============================================================== */}
+      {/* 2D ARCTIC ROOM BACKGROUND */}
       <svg
         viewBox="0 0 500 800"
         preserveAspectRatio="xMidYMid slice"
@@ -234,48 +249,17 @@ export default function KanShanStage2D({
           </linearGradient>
           <linearGradient id="floorGrad2d" x1="0" y1="0" x2="0" y2="1">
             <stop offset="0%" stopColor="#d8e9fc" />
-            <stop offset="100%" stopColor="#b8d4f4" />
-          </linearGradient>
-          <linearGradient id="nightWindow" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#5b7db1" />
-            <stop offset="60%" stopColor="#7fa6d8" />
-            <stop offset="100%" stopColor="#a9ccf0" />
+            <stop offset="100%" stopColor="#bad5f5" />
           </linearGradient>
           <linearGradient id="shellPetal" x1="0" y1="0" x2="0" y2="1">
-            <stop offset="0%" stopColor="#d9ecff" />
-            <stop offset="100%" stopColor="#a6cbf0" />
+            <stop offset="0%" stopColor="#e8f3ff" />
+            <stop offset="100%" stopColor="#b8d6f6" />
           </linearGradient>
         </defs>
 
-        <rect x="0" y="0" width="500" height="535" fill="url(#wallGrad2d)" />
-        <rect x="0" y="524" width="500" height="14" fill="#eef6ff" opacity="0.85" />
+        <rect x="0" y="0" width="500" height="545" fill="url(#wallGrad2d)" />
         <rect x="0" y="538" width="500" height="262" fill="url(#floorGrad2d)" />
-
-        {/* Arched Storybook Arctic Window */}
-        <g transform="translate(318, 212)">
-          <path
-            d="M10 120 L10 52 A46 46 0 0 1 102 52 L102 120 Z"
-            fill="url(#nightWindow)"
-            stroke="#f4f9ff"
-            strokeWidth="7"
-            strokeLinejoin="round"
-          />
-          <path
-            d="M18 68 Q52 46 94 62"
-            fill="none"
-            stroke="#a7f3d0"
-            strokeWidth="6"
-            strokeLinecap="round"
-            opacity="0.55"
-          />
-          <circle cx="36" cy="36" r="2.2" fill="#ffffff" opacity="0.85" />
-          <circle cx="76" cy="44" r="1.8" fill="#ffffff" opacity="0.75" />
-          <circle cx="62" cy="92" r="2.4" fill="#ffffff" opacity="0.8" />
-          <line x1="56" y1="8" x2="56" y2="120" stroke="#f4f9ff" strokeWidth="4.5" />
-          <line x1="10" y1="68" x2="102" y2="68" stroke="#f4f9ff" strokeWidth="4.5" />
-          <rect x="2" y="116" width="108" height="11" rx="5.5" fill="#ffffff" />
-        </g>
-
+        <rect x="0" y="532" width="500" height="10" fill="#eef6ff" opacity="0.85" />
         <polygon points="60,0 265,0 385,538 120,538" fill="#ffffff" opacity="0.22" />
 
         {/* 2D Shell Sofa */}
@@ -288,8 +272,6 @@ export default function KanShanStage2D({
           <path d="M154 118 C170 46, 200 72, 188 128 Z" fill="url(#shellPetal)" stroke="#9bc2ea" strokeWidth="2" />
           <rect x="18" y="126" width="180" height="48" rx="24" fill="#a8ccf0" stroke="#93bbe6" strokeWidth="2" />
           <ellipse cx="108" cy="128" rx="84" ry="20" fill="#e4f1fe" />
-          <circle cx="24" cy="124" r="16" fill="#c5e0fa" />
-          <circle cx="192" cy="124" r="16" fill="#c5e0fa" />
         </g>
 
         {/* 2D Giant Paw Rug */}
@@ -307,54 +289,41 @@ export default function KanShanStage2D({
         </g>
       </svg>
 
-      {/* =============================================================== */}
-      {/* 2D SPARKLING SCATTERED TREASURES IN ROOM!                       */}
-      {/* =============================================================== */}
+      {/* SUBTLE LOW-KEY ROOM TREASURES */}
       {hoardedItems.slice(0, 3).map((item, idx) => (
         <button
           key={item.id}
           onClick={() => onSelectHoardItem(item)}
-          className={`group absolute ${spotClasses[idx]} z-20 flex flex-col items-center cursor-pointer`}
+          className={`group absolute ${spotClasses[idx]} z-20 flex flex-col items-center cursor-pointer opacity-90 hover:opacity-100 transition`}
           style={{
-            animation: `ks-treasure-bob ${2.6 + idx * 0.35}s ease-in-out infinite`,
+            animation: `ks-treasure-bob ${3.2 + idx * 0.4}s ease-in-out infinite`,
           }}
         >
-          {/* Warm Golden Shimmer Aura */}
-          <div className="relative flex items-center justify-center">
-            <span className="absolute w-14 h-14 rounded-full bg-amber-200/65 blur-md group-hover:bg-amber-300/85 transition" />
-            {/* Twinkling 4-Point Stars */}
+          <div className="relative flex items-center justify-center scale-90">
+            <span className="absolute w-9 h-9 rounded-full bg-amber-200/35 blur-sm group-hover:bg-amber-200/60 transition" />
             <svg
               viewBox="0 0 20 20"
-              className="absolute -top-2 -right-2 w-4 h-4 fill-[#fef08a]"
-              style={{ animation: "ks-twinkle 1.6s ease-in-out infinite" }}
-            >
-              <path d="M10 0 L12.2 7.8 L20 10 L12.2 12.2 L10 20 L7.8 12.2 L0 10 L7.8 7.8 Z" />
-            </svg>
-            <svg
-              viewBox="0 0 20 20"
-              className="absolute -bottom-1 -left-2 w-3.5 h-3.5 fill-white"
-              style={{ animation: "ks-twinkle 2.1s ease-in-out 0.6s infinite" }}
+              className="absolute -top-1 -right-1 w-2.5 h-2.5 fill-[#fef08a]"
+              style={{ animation: "ks-twinkle 2.2s ease-in-out infinite" }}
             >
               <path d="M10 0 L12.2 7.8 L20 10 L12.2 12.2 L10 20 L7.8 12.2 L0 10 L7.8 7.8 Z" />
             </svg>
             <Treasure2DGlyph kind={item.emoji} />
           </div>
-          <span className="mt-0.5 px-2 py-0.5 rounded-full bg-[#fdfbf7]/90 shadow-2xs text-[11px] font-bold text-[#784315] whitespace-nowrap">
+          <span className="px-1.5 py-0.5 rounded-full bg-[#fdfbf7]/80 text-[10px] font-semibold text-[#784315]/85 whitespace-nowrap">
             {item.itemName}
           </span>
         </button>
       ))}
 
-      {/* =============================================================== */}
-      {/* INTERACTIVE 2D STORYBOOK LIU KANSHAN                            */}
-      {/* =============================================================== */}
-      <div className="relative z-10 mt-14 flex items-center justify-center">
+      {/* STANDING 2D LIU KANSHAN (Matching Reference Photos 1–4!) */}
+      <div className="relative z-10 mt-10 flex items-center justify-center">
         {hearts.map((id, idx) => (
           <div
             key={id}
-            className="pointer-events-none absolute -top-4 z-30"
+            className="pointer-events-none absolute -top-2 z-30"
             style={{
-              left: `${42 + (idx % 3) * 14}%`,
+              left: `${45 + (idx % 3) * 12}%`,
               animation: "ks-float-up 1s ease-out forwards",
             }}
           >
@@ -365,283 +334,283 @@ export default function KanShanStage2D({
         ))}
 
         <svg
-          viewBox="0 0 360 440"
-          className="w-[218px] sm:w-[242px] mt-10 h-auto overflow-visible drop-shadow-[0_12px_22px_rgba(92,130,178,0.18)]"
+          viewBox="0 0 380 460"
+          className="w-[240px] sm:w-[264px] mt-8 h-auto overflow-visible drop-shadow-[0_12px_20px_rgba(92,130,178,0.16)]"
         >
           <defs>
-            <linearGradient id="ksBody2d" x1="0.2" y1="0" x2="0.85" y2="1">
+            <linearGradient id="ksBody2d" x1="0.15" y1="0" x2="0.85" y2="1">
               <stop offset="0%" stopColor="#ffffff" />
-              <stop offset="72%" stopColor="#f8fbff" />
+              <stop offset="76%" stopColor="#f8fbff" />
               <stop offset="100%" stopColor="#e6f0fb" />
             </linearGradient>
-            <radialGradient id="ksNose2d" cx="38%" cy="32%" r="65%">
-              <stop offset="0%" stopColor="#465268" />
-              <stop offset="55%" stopColor="#323c4f" />
-              <stop offset="100%" stopColor="#262e3e" />
-            </radialGradient>
-            <radialGradient id="ksBlush" cx="50%" cy="50%" r="50%">
-              <stop offset="0%" stopColor="#fda4af" stopOpacity="0.58" />
-              <stop offset="100%" stopColor="#fda4af" stopOpacity="0" />
-            </radialGradient>
           </defs>
 
-          <ellipse cx="180" cy="396" rx="88" ry="15" fill="#8bb6e8" opacity="0.38" />
+          {/* Ground shadows */}
+          <ellipse cx="222" cy="418" rx="68" ry="12" fill="#8bb6e8" opacity="0.34" />
+          <ellipse cx="66" cy="410" rx="46" ry="9" fill="#8bb6e8" opacity="0.28" />
 
+          {/* Bigger Progressive 1 -> 2 -> 3 Snowballs on Left Rug */}
+          <g onClick={onTapSnowman} className="cursor-pointer">
+            <g
+              style={{
+                transformOrigin: "66px 386px",
+                animation:
+                  snowTier === 1 && idleMode === "pat"
+                    ? "ks-snow-squish 4.2s ease-in-out infinite"
+                    : undefined,
+              }}
+            >
+              <ellipse cx="66" cy="386" rx="36" ry="30" fill="#ffffff" stroke="#cfe2f7" strokeWidth="3" />
+            </g>
+            {snowTier >= 2 && (
+              <g
+                style={{
+                  transformOrigin: "66px 334px",
+                  animation:
+                    snowTier === 2 && idleMode === "pat"
+                      ? "ks-snow-squish 4.2s ease-in-out infinite"
+                      : undefined,
+                }}
+              >
+                <ellipse cx="66" cy="334" rx="28" ry="24" fill="#ffffff" stroke="#cfe2f7" strokeWidth="3" />
+              </g>
+            )}
+            {snowTier >= 3 && (
+              <g
+                style={{
+                  transformOrigin: "66px 290px",
+                  animation:
+                    idleMode === "pat" ? "ks-snow-squish 4.2s ease-in-out infinite" : undefined,
+                }}
+              >
+                <circle cx="66" cy="290" r="20" fill="#ffffff" stroke="#cfe2f7" strokeWidth="3" />
+                <circle cx="60" cy="288" r="2.4" fill="#1e2430" />
+                <circle cx="72" cy="288" r="2.4" fill="#1e2430" />
+              </g>
+            )}
+          </g>
+
+          {/* Standing Liu Kanshan Group (3/4 Photo-4 Silhouette!) */}
           <g
             style={{
-              transformOrigin: "180px 350px",
+              transformOrigin: "220px 380px",
               transition: "transform 220ms cubic-bezier(0.34, 1.56, 0.64, 1)",
               transform:
                 squish === "pat" || isHuntingTreasure
-                  ? "scale(1.07, 0.92) translateY(8px)"
-                  : squish === "nose"
-                  ? "scale(1.03, 0.97)"
+                  ? "scale(1.06, 0.93) translateY(8px)"
                   : "scale(1, 1)",
             }}
           >
             <g
               style={{
-                transformOrigin: "180px 340px",
-                animation: "ks-breathe 3.4s ease-in-out infinite",
+                transformOrigin: "220px 380px",
+                animation:
+                  idleMode === "sway"
+                    ? "ks-sway-dance 1.8s ease-in-out infinite"
+                    : "ks-breathe 3.4s ease-in-out infinite",
               }}
             >
-              {/* Tail */}
+              {/* Round White Pom-Pom Tail at Lower Back (Photo 3 & 4!) */}
               <g
                 style={{
-                  transformOrigin: "112px 322px",
-                  animation: "ks-tail 2.4s ease-in-out infinite",
+                  transformOrigin: "156px 298px",
+                  animation: "ks-tail 2.1s ease-in-out infinite",
                 }}
               >
                 <circle
-                  cx="88"
-                  cy="322"
-                  r="25"
-                  fill="#f3f8ff"
+                  cx="134"
+                  cy="300"
+                  r="24"
+                  fill="#f6faff"
                   stroke="#cfdff2"
                   strokeWidth="3"
                 />
               </g>
 
-              {/* Autonomous Non-Clipping Snowman Stacking Side Arms */}
-              <g>
-                <g
-                  style={{
-                    transformOrigin: "102px 242px",
-                    animation: "ks-pat-snow 4.8s ease-in-out infinite",
-                  }}
-                >
-                  <path
-                    d="M102 242 Q76 278 76 322"
-                    fill="none"
-                    stroke="#333e52"
-                    strokeWidth="21"
-                    strokeLinecap="round"
-                  />
-                </g>
+              {/* Sturdy Charcoal-Black Standing Legs + Plump Rounded Boots! */}
+              <g fill="#1f242e">
+                {/* Left leg & boot */}
+                <rect x="184" y="338" width="22" height="68" rx="10" />
+                <ellipse cx="198" cy="408" rx="20" ry="13" />
+                {/* Right leg & boot */}
+                <rect x="234" y="338" width="22" height="68" rx="10" />
+                <ellipse cx="250" cy="408" rx="21" ry="13" />
+              </g>
+
+              {/* Left Charcoal Arm + 4-Fingered Hand (Waves in Photo-4 pose or pats air beside snow!) */}
+              <g
+                style={{
+                  transformOrigin: "162px 226px",
+                  animation:
+                    idleMode === "wave"
+                      ? "ks-wave-hi 1.2s ease-in-out infinite"
+                      : "ks-pat-snow 4.2s ease-in-out infinite",
+                }}
+              >
                 <path
-                  d="M260 236 Q282 278 274 332"
+                  d="M162 226 Q134 256 130 296"
                   fill="none"
-                  stroke="#333e52"
-                  strokeWidth="22"
+                  stroke="#1f242e"
+                  strokeWidth="17"
                   strokeLinecap="round"
                 />
+                <circle cx="129" cy="300" r="11" fill="#1f242e" />
+                <circle cx="138" cy="295" r="4.5" fill="#1f242e" />
+                <circle cx="121" cy="307" r="4.2" fill="#1f242e" />
+                <circle cx="128" cy="310" r="4.2" fill="#1f242e" />
+                <circle cx="135" cy="308" r="4.2" fill="#1f242e" />
+              </g>
+
+              {/* Right Charcoal Arm + 4-Fingered Hand */}
+              <g>
+                <path
+                  d="M278 232 Q294 268 290 310"
+                  fill="none"
+                  stroke="#1f242e"
+                  strokeWidth="17"
+                  strokeLinecap="round"
+                />
+                <circle cx="289" cy="314" r="10.5" fill="#1f242e" />
+                <circle cx="282" cy="321" r="4" fill="#1f242e" />
+                <circle cx="289" cy="323" r="4" fill="#1f242e" />
+                <circle cx="296" cy="320" r="4" fill="#1f242e" />
               </g>
 
               {/* Codfish Snack */}
               {eq.includes("codfish_plush") && (
-                <g transform="translate(272, 326) rotate(18)">
-                  <ellipse cx="14" cy="0" rx="18" ry="10" fill="#7dd3fc" stroke="#38bdf8" strokeWidth="2.5" />
-                  <polygon points="30,0 42,-9 42,9" fill="#38bdf8" />
-                  <circle cx="6" cy="-2" r="2.2" fill="#1e293b" />
+                <g transform="translate(292, 316) rotate(18)">
+                  <ellipse cx="12" cy="0" rx="16" ry="9" fill="#7dd3fc" stroke="#38bdf8" strokeWidth="2.2" />
+                  <polygon points="26,0 37,-8 37,8" fill="#38bdf8" />
+                  <circle cx="5" cy="-2" r="2" fill="#1e293b" />
                 </g>
               )}
 
-              {/* Chubby Sitting Body */}
+              {/* Tall Pear-Cylinder White Body + Upright Fox Ears + 3/4 Upturned Snout (Photo 4!) */}
               <g onClick={triggerPat} className="cursor-pointer">
                 <path
-                  d={`
-                    M ${122 + earX} 132
-                    C ${120 + earX} 82, ${134 + earX} 70, ${148 + earX} 78
-                    C ${158 + earX} 84, ${164 + earX} 106, 168 122
-                    Q 180 120, 192 122
-                    C ${196 + earX} 106, ${202 + earX} 84, ${212 + earX} 78
-                    C ${226 + earX} 70, ${240 + earX} 82, ${238 + earX} 132
-                    C 262 172, 272 246, 272 318
-                    C 272 366, 236 382, 180 382
-                    C 124 382, 88 366, 88 318
-                    C 88 246, 98 172, ${122 + earX} 132
+                  d="
+                    M 176 116
+                    C 174 68, 190 60, 202 74
+                    C 210 84, 214 102, 218 112
+                    Q 230 110, 240 112
+                    C 246 96, 254 70, 266 72
+                    C 278 74, 282 98, 278 128
+                    C 292 164, 292 246, 288 304
+                    C 284 344, 256 356, 220 356
+                    C 180 356, 152 342, 152 298
+                    C 152 232, 160 162, 176 116
                     Z
-                  `}
+                  "
                   fill="url(#ksBody2d)"
                   stroke="#cfe0f5"
-                  strokeWidth="3.2"
+                  strokeWidth="3"
                   strokeLinejoin="round"
                 />
 
-                {/* Cute Chubby White Sitting Feet */}
-                <rect x="122" y="346" width="38" height="46" rx="19" fill="#ffffff" stroke="#cfe0f5" strokeWidth="3" />
-                <rect x="200" y="346" width="38" height="46" rx="19" fill="#ffffff" stroke="#cfe0f5" strokeWidth="3" />
+                {/* Sculpted Upturned Conical Snout Mound (Photo 3 & 4!) */}
+                <path
+                  d="M 218 152 C 252 146, 294 148, 304 176 C 310 202, 276 222, 232 214"
+                  fill="#ffffff"
+                  stroke="#d5e4f7"
+                  strokeWidth="2.4"
+                  strokeLinecap="round"
+                />
               </g>
 
-              {/* Blush */}
-              <circle
-                cx={118 + faceX * 0.6}
-                cy={212 + faceY * 0.6}
-                r="16"
-                fill="url(#ksBlush)"
-                opacity={isSmiling ? 0.9 : 0.4}
-              />
-              <circle
-                cx={242 + faceX * 0.6}
-                cy={212 + faceY * 0.6}
-                r="16"
-                fill="url(#ksBlush)"
-                opacity={isSmiling ? 0.9 : 0.4}
-              />
-
-              {/* Eyes + Continuous-Brow Glasses */}
-              <g
-                transform={`translate(${faceX}, ${faceY})`}
-                onClick={triggerPat}
-                className="cursor-pointer"
-              >
+              {/* Crisp Oval Bead Eyes */}
+              <g transform={`translate(${faceX}, ${faceY})`} onClick={triggerPat} className="cursor-pointer">
                 {isSmiling ? (
-                  <>
-                    <path
-                      d="M122 188 Q130 177 138 188"
-                      fill="none"
-                      stroke="#252e3f"
-                      strokeWidth="4.6"
-                      strokeLinecap="round"
-                    />
-                    <path
-                      d="M222 188 Q230 177 238 188"
-                      fill="none"
-                      stroke="#252e3f"
-                      strokeWidth="4.6"
-                      strokeLinecap="round"
-                    />
-                  </>
+                  <path
+                    d="M192 166 Q200 156 208 166"
+                    fill="none"
+                    stroke="#1b2029"
+                    strokeWidth="4.4"
+                    strokeLinecap="round"
+                  />
                 ) : isBlinking ? (
-                  <>
-                    <line x1="124" y1="186" x2="136" y2="186" stroke="#252e3f" strokeWidth="4" strokeLinecap="round" />
-                    <line x1="224" y1="186" x2="236" y2="186" stroke="#252e3f" strokeWidth="4" strokeLinecap="round" />
-                  </>
+                  <line x1="194" y1="164" x2="206" y2="164" stroke="#1b2029" strokeWidth="3.8" strokeLinecap="round" />
                 ) : (
-                  <>
-                    <ellipse cx="130" cy="186" rx="4.8" ry="6.4" fill="#1e2532" />
-                    <ellipse cx="230" cy="186" rx="4.8" ry="6.4" fill="#1e2532" />
-                  </>
+                  <ellipse cx="200" cy="164" rx="4.8" ry="6.8" fill="#181d26" />
                 )}
 
                 {eq.includes("thick_glasses") && (
-                  <g fill="none" stroke="#313b4e" strokeWidth="6.5">
-                    <rect x="102" y="166" width="54" height="40" rx="11" fill="#ffffff" fillOpacity="0.2" />
-                    <rect x="204" y="166" width="54" height="40" rx="11" fill="#ffffff" fillOpacity="0.2" />
-                    <path d="M104 167 Q180 160 256 167" strokeWidth="7" strokeLinecap="round" />
+                  <g fill="none" stroke="#252c3b" strokeWidth="5.5">
+                    <rect x="180" y="146" width="40" height="34" rx="9" fill="#ffffff" fillOpacity="0.18" />
+                    <line x1="162" y1="158" x2="180" y2="158" strokeLinecap="round" />
+                    <path d="M220 156 Q244 148 264 154" strokeLinecap="round" />
                   </g>
                 )}
               </g>
 
-              {/* Nose */}
+              {/* Big Seamless Charcoal-Black Nose Cap at Tip of Snout! */}
               <g
-                transform={`translate(${noseX}, ${noseY})`}
+                transform={`translate(${faceX * 1.1}, ${faceY * 1.1})`}
                 onPointerDown={handleNoseDown}
                 onPointerUp={handleNoseUp}
                 className="cursor-pointer"
               >
                 {isRecordingNose && (
-                  <ellipse
-                    cx="180"
-                    cy="202"
-                    rx="48"
-                    ry="40"
+                  <circle
+                    cx="286"
+                    cy="176"
+                    r="36"
                     fill="none"
                     stroke="#60a5fa"
-                    strokeWidth="3.5"
+                    strokeWidth="3.2"
                     strokeDasharray="6 6"
                   />
                 )}
-                <ellipse cx="180" cy="202" rx="34" ry="29" fill="url(#ksNose2d)" />
+                <ellipse
+                  cx="286"
+                  cy="176"
+                  rx="26"
+                  ry="25"
+                  transform="rotate(-10 286 176)"
+                  fill="#1b2029"
+                />
               </g>
 
-              {/* Scarf */}
+              {/* Optional Knitted Scarf */}
               {eq.includes("zhihu_scarf") && (
                 <g>
                   <path
-                    d="M98 242 Q180 262 262 242 L258 268 Q180 288 102 268 Z"
-                    fill="#4f8ff0"
+                    d="M158 214 Q222 232 282 216 L280 238 Q222 254 160 236 Z"
+                    fill="#4a8df8"
                     stroke="#3b76d4"
-                    strokeWidth="2.5"
+                    strokeWidth="2.4"
                     strokeLinejoin="round"
                   />
                   <rect
-                    x="196"
-                    y="256"
-                    width="28"
-                    height="56"
-                    rx="10"
-                    transform="rotate(-8 196 256)"
+                    x="234"
+                    y="228"
+                    width="24"
+                    height="48"
+                    rx="9"
+                    transform="rotate(-8 234 228)"
                     fill="#3b82f6"
                     stroke="#2f6bc4"
-                    strokeWidth="2.2"
+                    strokeWidth="2"
                   />
                 </g>
               )}
 
-              {/* Beanie */}
+              {/* Optional Beanie */}
               {eq.includes("camp_beanie") && (
-                <g transform={`translate(${earX}, 8)`}>
-                  <circle cx="180" cy="64" r="11" fill="#fbbf24" />
-                  <path d="M144 108 C146 74, 214 74, 216 108 Z" fill="#313b4e" />
-                  <rect x="140" y="102" width="80" height="14" rx="7" fill="#fbbf24" />
+                <g>
+                  <circle cx="228" cy="70" r="9.5" fill="#fbbf24" />
+                  <path d="M198 106 C200 78, 256 78, 258 106 Z" fill="#313b4e" />
+                  <rect x="195" y="102" width="66" height="12" rx="6" fill="#fbbf24" />
                 </g>
               )}
 
-              {/* Earmuffs */}
+              {/* Optional Earmuffs */}
               {eq.includes("ear_muffs") && (
-                <g transform={`translate(${earX}, 10)`}>
-                  <path d="M118 122 Q180 88 242 122" fill="none" stroke="#93c5fd" strokeWidth="6" strokeLinecap="round" />
-                  <circle cx="116" cy="128" r="16" fill="#fda4af" stroke="#fb7185" strokeWidth="2" />
-                  <circle cx="244" cy="128" r="16" fill="#fda4af" stroke="#fb7185" strokeWidth="2" />
+                <g>
+                  <path d="M174 114 Q228 84 278 116" fill="none" stroke="#93c5fd" strokeWidth="5.5" strokeLinecap="round" />
+                  <circle cx="172" cy="120" r="14" fill="#fda4af" stroke="#fb7185" strokeWidth="2" />
+                  <circle cx="280" cy="120" r="14" fill="#fda4af" stroke="#fb7185" strokeWidth="2" />
                 </g>
               )}
-
-              {/* Progressive 1 -> 2 -> 3 Snowman Beside Liu Kanshan ("一开始只有一个雪球然后慢慢堆起来") */}
-              <g onClick={onTapSnowman} className="cursor-pointer">
-                <g
-                  style={{
-                    transformOrigin: "34px 378px",
-                    animation:
-                      snowTier === 1 ? "ks-snow-squish 4.8s ease-in-out infinite" : undefined,
-                  }}
-                >
-                  <circle cx="34" cy="378" r="25" fill="#ffffff" stroke="#cfe2f7" strokeWidth="3" />
-                </g>
-                {snowTier >= 2 && (
-                  <g
-                    style={{
-                      transformOrigin: "34px 338px",
-                      animation:
-                        snowTier === 2 ? "ks-snow-squish 4.8s ease-in-out infinite" : undefined,
-                    }}
-                  >
-                    <circle cx="34" cy="338" r="19" fill="#ffffff" stroke="#cfe2f7" strokeWidth="3" />
-                  </g>
-                )}
-                {snowTier >= 3 && (
-                  <g
-                    style={{
-                      transformOrigin: "34px 305px",
-                      animation: "ks-snow-squish 4.8s ease-in-out infinite",
-                    }}
-                  >
-                    <circle cx="34" cy="305" r="15" fill="#ffffff" stroke="#cfe2f7" strokeWidth="3" />
-                    <circle cx="29" cy="303" r="2" fill="#252e3f" />
-                    <circle cx="39" cy="303" r="2" fill="#252e3f" />
-                  </g>
-                )}
-              </g>
             </g>
           </g>
         </svg>

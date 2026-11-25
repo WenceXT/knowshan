@@ -39,66 +39,64 @@ function sdTaperedCapsule(
 }
 
 /**
- * Designer-Toy (JOYBRAIN × Zhihu Blind-Box / Cozy Sitting Plushie) Liu Kanshan SDF:
- * - 1:1 Chubby Marshmallow Cylinder-Mochi Body (wide cute cheeks & forehead, NEVER pointy egg!)
- * - Flat-cushioned sitting base resting squarely on the fluffy rug
- * - Wide-set, plump, soft-edged Arctic Fox ears framing a broad innocent forehead
- * - Subtle smooth snout mound blended seamlessly into the face
+ * Photo-Accurate Canonical Standing 3D Liu Kanshan SDF (from Reference Photos 1–4):
+ * - Smooth pear-cylinder upright white body: straight continuous back line & gently full rounded lower belly
+ * - Bold, iconic horizontal/slightly-upturned conical fox snout with smooth concave throat curve underneath
+ * - Upright pointed-rounded Arctic Fox ears set at the top-back of the head
  */
 export function evalCartoonKanshanSDF(x: number, y: number, z: number): number {
-  // 1. Wide, huggable 1:1 marshmallow cylinder-pear body (rBottom=0.425, rTop=0.382 -> broad cute head!)
-  const dBodyRaw = sdTaperedCapsule(
-    x * 0.86,
+  // 1. Tall pear-capsule torso: straight back (~z = -0.29), gently full lower belly, smooth rounded bottom
+  const dTorsoRaw = sdTaperedCapsule(
+    x * 0.98,
     y,
-    z * 0.94,
+    z,
     0,
-    -0.16,
-    0.0,
+    -0.21,
+    0.025,
     0,
-    0.16,
-    0.0,
-    0.425,
-    0.382
+    0.24,
+    -0.02,
+    0.335,
+    0.268
   );
-  // Softly flatten sitting bottom at y = -0.48 so it sits plumply right on the rug!
-  const dSittingBody = smax(dBodyRaw, -(y + 0.485), 0.115);
+  // Smoothly round/level the under-belly where the two standing black legs emerge
+  const dTorsoBottom = smax(dTorsoRaw, -(y + 0.505), 0.085);
+  // Softly level the crown dome between the ears
+  const dTorso = smax(dTorsoBottom, y - 0.445, 0.075);
 
-  // Also gently flatten the top forehead dome slightly so the brow between the ears is wide & cute!
-  const dSoftCrown = smax(dSittingBody, y - 0.485, 0.085);
-
-  // 2. Wide-set, plump, soft-tipped Arctic Fox ears (positioned wider apart at x = ±0.235!)
+  // 2. Upright conical-rounded Arctic Fox ears at the top-back of the head (continuing the straight back!)
   const ax = Math.abs(x);
   const dEar = sdTaperedCapsule(
     ax,
     y,
-    (z + 0.01) * 1.18,
-    0.225,
-    0.31,
+    (z + 0.085) * 1.22,
+    0.148,
+    0.34,
     0,
-    0.242,
-    0.615,
+    0.162,
+    0.675,
     0,
-    0.155,
-    0.068
+    0.112,
+    0.034
   );
-  const dHeadEars = smin(dSoftCrown, dEar, 0.062);
+  const dHeadEars = smin(dTorso, dEar, 0.052);
 
-  // 3. Short, plump, stream-lined fox muzzle mound (blends seamlessly into face)
-  const dMuzzle = sdTaperedCapsule(
-    x * 0.88,
+  // 3. Signature bold, slightly upturned conical fox snout!
+  const dSnout = sdTaperedCapsule(
+    x * 0.96,
     y,
     z,
     0,
-    0.18,
-    0.12,
+    0.215,
+    0.04,
     0,
-    0.195,
-    0.365,
-    0.195,
-    0.148
+    0.308,
+    0.455,
+    0.205,
+    0.126
   );
 
-  return smin(dHeadEars, dMuzzle, 0.105);
+  return smin(dHeadEars, dSnout, 0.115);
 }
 
 export function findBodyRadiusAtAngle(y: number, theta: number): number {
@@ -150,7 +148,7 @@ export function buildSmoothSDFMesh(
   material: THREE.Material,
   sdfFn: (x: number, y: number, z: number) => number
 ): THREE.Mesh {
-  const mc = new MarchingCubes(resolution, material, false, false, 190000);
+  const mc = new MarchingCubes(resolution, material, false, false, 200000);
   mc.isolation = 0.0;
   mc.reset();
 
@@ -205,6 +203,127 @@ export function buildSmoothSDFMesh(
   mc.geometry.dispose();
 
   return new THREE.Mesh(bakedGeo, material);
+}
+
+/**
+ * Slender Charcoal-Black Arm + Cute 4-Fingered Hand (3 plump fingers + 1 opposable thumb, per Photos 1–4!)
+ */
+export function buildFourFingeredArm(
+  side: number,
+  S: number,
+  limbMat: THREE.Material
+): THREE.Group {
+  const armY = 0.02;
+  const armZ = -0.01;
+  const shoulderSurfX = findSurfaceX(armY, armZ);
+
+  const pivot = new THREE.Group();
+  pivot.position.set(side * (shoulderSurfX - 0.032) * S, armY * S, armZ * S);
+
+  // Seamless shoulder joint sphere tucked inside torso
+  const shoulderCap = new THREE.Mesh(new THREE.SphereGeometry(0.042 * S, 16, 16), limbMat);
+  pivot.add(shoulderCap);
+
+  // Gently curved slender charcoal arm
+  const armCurve = new THREE.CatmullRomCurve3([
+    new THREE.Vector3(0, 0, 0),
+    new THREE.Vector3(side * 0.055 * S, -0.15 * S, 0.018 * S),
+    new THREE.Vector3(side * 0.052 * S, -0.31 * S, 0.048 * S),
+  ]);
+
+  const armTube = new THREE.Mesh(
+    new THREE.TubeGeometry(armCurve, 22, 0.038 * S, 16, false),
+    limbMat
+  );
+  armTube.castShadow = true;
+  pivot.add(armTube);
+
+  // Cute 4-Fingered Mitten Hand (Palm + Thumb + 3 Rounded Fingers!)
+  const handGroup = new THREE.Group();
+  handGroup.position.set(side * 0.052 * S, -0.32 * S, 0.052 * S);
+
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.052 * S, 18, 16), limbMat);
+  palm.scale.set(0.78, 1.05, 0.95);
+  palm.castShadow = true;
+  handGroup.add(palm);
+
+  // Thumb pointing forward/upward
+  const thumb = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.017 * S, 0.032 * S, 8, 12),
+    limbMat
+  );
+  thumb.position.set(-side * 0.012 * S, -0.01 * S, 0.048 * S);
+  thumb.rotation.x = Math.PI * 0.34;
+  thumb.rotation.z = side * 0.25;
+  handGroup.add(thumb);
+
+  // 3 plump rounded fingers fanned slightly (exact silhouette from Photos 1, 2, 4!)
+  [-0.24, 0, 0.24].forEach((fan, idx) => {
+    const len = idx === 1 ? 0.042 * S : 0.036 * S;
+    const finger = new THREE.Mesh(
+      new THREE.CapsuleGeometry(0.0165 * S, len, 8, 12),
+      limbMat
+    );
+    finger.position.set(
+      side * 0.004 * S,
+      (-0.048 - (idx === 1 ? 0.004 : 0)) * S,
+      (-fan * 0.095 + 0.006) * S
+    );
+    finger.rotation.x = -fan * 0.55 + 0.12;
+    finger.castShadow = true;
+    handGroup.add(finger);
+  });
+
+  pivot.add(handGroup);
+  return pivot;
+}
+
+/**
+ * Sturdy Charcoal-Black Standing Leg + Plump Forward-Rounded Boot (Sole strictly at local y = -0.34 * S, per Photos 3 & 4!)
+ */
+export function buildStandingLeg(
+  side: number,
+  S: number,
+  limbMat: THREE.Material
+): THREE.Group {
+  const hipPivot = new THREE.Group();
+  hipPivot.position.set(side * 0.145 * S, -0.455 * S, -0.005 * S);
+
+  // Hip joint sphere tucked cleanly inside white lower belly
+  const hipCap = new THREE.Mesh(new THREE.SphereGeometry(0.058 * S, 16, 16), limbMat);
+  hipPivot.add(hipCap);
+
+  // Sturdy vertical charcoal leg cylinder
+  const shaft = new THREE.Mesh(
+    new THREE.CylinderGeometry(0.054 * S, 0.060 * S, 0.26 * S, 22),
+    limbMat
+  );
+  shaft.position.y = -0.135 * S;
+  shaft.castShadow = true;
+  hipPivot.add(shaft);
+
+  // Plump forward-pointing rounded boot/foot (flat cushioned sole at y = -0.34 * S!)
+  const bootGroup = new THREE.Group();
+  bootGroup.position.set(0, -0.285 * S, 0.042 * S);
+
+  const bootMain = new THREE.Mesh(
+    new THREE.CapsuleGeometry(0.056 * S, 0.078 * S, 14, 20),
+    limbMat
+  );
+  bootMain.rotation.x = Math.PI / 2;
+  bootMain.scale.set(1.12, 1.0, 0.96);
+  bootMain.castShadow = true;
+  bootMain.receiveShadow = true;
+  bootGroup.add(bootMain);
+
+  // Subtle rounded heel blend
+  const heel = new THREE.Mesh(new THREE.SphereGeometry(0.058 * S, 16, 14), limbMat);
+  heel.scale.set(1.04, 0.92, 1.0);
+  heel.position.set(0, 0.004 * S, -0.036 * S);
+  bootGroup.add(heel);
+
+  hipPivot.add(bootGroup);
+  return hipPivot;
 }
 
 /**
@@ -266,7 +385,7 @@ export function createKnittedTextures(
 }
 
 /**
- * Flush Contoured Double-Coil Knitted Scarf
+ * Flush Contoured Knitted Scarf fitted around Standing Liu Kanshan's neck (y ≈ 0.085)
  */
 export function buildContouredKnittedScarf(S: number): THREE.Group {
   const group = new THREE.Group();
@@ -299,24 +418,24 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
   };
 
   const lowerCoil = new THREE.Mesh(
-    new THREE.TubeGeometry(makeCoilCurve(-0.02, -0.015, 0.035, 0.005), 72, 0.045 * S, 18, true),
+    new THREE.TubeGeometry(makeCoilCurve(0.068, -0.010, 0.028, 0.004), 72, 0.036 * S, 18, true),
     woolMat
   );
   lowerCoil.castShadow = true;
   group.add(lowerCoil);
 
   const upperCoil = new THREE.Mesh(
-    new THREE.TubeGeometry(makeCoilCurve(0.032, -0.012, 0.028, -0.004), 72, 0.042 * S, 18, true),
+    new THREE.TubeGeometry(makeCoilCurve(0.108, -0.008, 0.022, -0.003), 72, 0.034 * S, 18, true),
     woolMat
   );
   upperCoil.castShadow = true;
   group.add(upperCoil);
 
-  const knotAngle = 0.36;
-  const knotY = -0.045;
-  const knotR = (findBodyRadiusAtAngle(knotY, knotAngle) + 0.016) * S;
-  const knotMesh = new THREE.Mesh(new THREE.SphereGeometry(0.066 * S, 20, 20), woolMat);
-  knotMesh.scale.set(1.18, 0.92, 0.88);
+  const knotAngle = 0.32;
+  const knotY = 0.048;
+  const knotR = (findBodyRadiusAtAngle(knotY, knotAngle) + 0.014) * S;
+  const knotMesh = new THREE.Mesh(new THREE.SphereGeometry(0.052 * S, 20, 20), woolMat);
+  knotMesh.scale.set(1.16, 0.92, 0.88);
   knotMesh.position.set(Math.sin(knotAngle) * knotR, knotY * S, Math.cos(knotAngle) * knotR);
   knotMesh.rotation.y = knotAngle;
   knotMesh.castShadow = true;
@@ -337,13 +456,13 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
       const t = i / segs;
       const ang = startAngle + (endAngle - startAngle) * t;
       const y = startY + (endY - startY) * t;
-      const r = (findBodyRadiusAtAngle(y, ang) + protrude + Math.sin(t * Math.PI) * 0.012) * S;
+      const r = (findBodyRadiusAtAngle(y, ang) + protrude + Math.sin(t * Math.PI) * 0.01) * S;
       curvePts.push(new THREE.Vector3(Math.sin(ang) * r, y * S, Math.cos(ang) * r));
     }
     const tailCurve = new THREE.CatmullRomCurve3(curvePts);
 
-    const w = 0.054 * S * widthScale;
-    const th = 0.016 * S;
+    const w = 0.044 * S * widthScale;
+    const th = 0.013 * S;
     const rectShape = new THREE.Shape();
     rectShape.moveTo(-w, -th);
     rectShape.quadraticCurveTo(0, -th * 1.25, w, -th);
@@ -352,10 +471,10 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
     rectShape.quadraticCurveTo(-w * 1.12, 0, -w, -th);
 
     const extrudeGeo = new THREE.ExtrudeGeometry(rectShape, {
-      steps: 24,
+      steps: 20,
       bevelEnabled: true,
-      bevelThickness: 0.007 * S,
-      bevelSize: 0.006 * S,
+      bevelThickness: 0.006 * S,
+      bevelSize: 0.005 * S,
       bevelSegments: 4,
       extrudePath: tailCurve,
     });
@@ -365,10 +484,17 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
 
     const endPt = curvePts[curvePts.length - 1];
     for (let f = -1.5; f <= 1.5; f += 1) {
-      const tassel = new THREE.Mesh(new THREE.CapsuleGeometry(0.009 * S, 0.028 * S, 8, 10), fringeMat);
+      const tassel = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.0075 * S, 0.022 * S, 8, 10),
+        fringeMat
+      );
       const offsetAngle = endAngle + f * 0.05;
       const tr = (findBodyRadiusAtAngle(endY, offsetAngle) + protrude) * S;
-      tassel.position.set(Math.sin(offsetAngle) * tr, endPt.y - 0.024 * S, Math.cos(offsetAngle) * tr);
+      tassel.position.set(
+        Math.sin(offsetAngle) * tr,
+        endPt.y - 0.02 * S,
+        Math.cos(offsetAngle) * tr
+      );
       tassel.rotation.z = -offsetAngle * 0.22;
       tailGroup.add(tassel);
     }
@@ -376,62 +502,42 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
     return tailGroup;
   };
 
-  group.add(buildDrapedTail(0.34, 0.42, -0.06, -0.31, 0.016, 1.0));
-  group.add(buildDrapedTail(0.47, 0.58, -0.06, -0.23, 0.008, 0.86));
+  group.add(buildDrapedTail(0.30, 0.36, 0.04, -0.19, 0.014, 1.0));
+  group.add(buildDrapedTail(0.42, 0.50, 0.04, -0.12, 0.008, 0.86));
 
   return group;
 }
 
 /**
- * Iconic Continuous-Brow Nerd-Chic Glasses (1:1 Tribute to User's Favorite Reference Image!):
- * - Soft velvety slate-navy (`#323c50`) continuous gentle brow bar across top of the big round nose
- * - Clean, bright, unobstructed eye windows (ZERO distracting diagonal stripes!) so tiny deadpan dot pupils shine!
- * - Wrapped smoothly around the wide marshmallow head with flush side hinges
+ * Glasses contoured cleanly over Standing Liu Kanshan's eyes & upper snout bridge
  */
 export function buildDetailedGlasses(S: number, eyeY: number): THREE.Group {
   const group = new THREE.Group();
 
   const frameMat = new THREE.MeshStandardMaterial({
-    color: 0x313b4e,
-    roughness: 0.46,
+    color: 0x232936,
+    roughness: 0.42,
     metalness: 0.08,
   });
 
-  // Clean, ultra-clear subtle glass sheen (zero stripes blocking the tiny dot eyes!)
-  const clearLensMat = new THREE.MeshStandardMaterial({
-    color: 0xf8fbff,
-    transparent: true,
-    opacity: 0.16,
-    roughness: 0.15,
-    metalness: 0.05,
-    depthWrite: false,
-  });
+  const eyewearZ = (x: number, y: number) => findFaceSurfaceZ(x, y) + 0.018;
 
-  const eyewearZ = (x: number, y: number) => {
-    const opticalArc = 0.435 - 1.12 * x * x;
-    const minClear = findFaceSurfaceZ(x, y) + 0.024;
-    return Math.max(opticalArc, minClear);
-  };
-
-  const centerX = 0.238;
-  const centerY = eyeY + 0.002;
-  const halfW = 0.098;
-  const halfH = 0.075;
+  const centerX = 0.188;
+  const centerY = eyeY + 0.004;
+  const halfW = 0.072;
+  const halfH = 0.062;
 
   [-1, 1].forEach((side) => {
     const cx = side * centerX;
     const pts: THREE.Vector3[] = [];
-    const steps = 48;
+    const steps = 40;
     for (let i = 0; i < steps; i++) {
       const a = (i / steps) * Math.PI * 2;
       const cosA = Math.cos(a);
       const sinA = Math.sin(a);
-      // Rectangular-rounded boxy nerd frame (exponent 0.52 -> crisp rounded rectangle like reference!)
-      const powCos = Math.sign(cosA) * Math.pow(Math.abs(cosA), 0.52);
-      const powSin = Math.sign(sinA) * Math.pow(Math.abs(sinA), 0.54);
-      // Slight inward curve at bottom-inner corner to hug the big round nose
-      const innerTaper = sinA < 0 && side * cosA < 0 ? 0.84 : 1.0;
-      const lx = cx + powCos * halfW * innerTaper;
+      const powCos = Math.sign(cosA) * Math.pow(Math.abs(cosA), 0.58);
+      const powSin = Math.sign(sinA) * Math.pow(Math.abs(sinA), 0.58);
+      const lx = cx + powCos * halfW;
       const ly = centerY + powSin * halfH;
       const wz = eyewearZ(lx, ly) * S;
       pts.push(new THREE.Vector3(lx * S, ly * S, wz));
@@ -439,76 +545,38 @@ export function buildDetailedGlasses(S: number, eyeY: number): THREE.Group {
 
     const frameCurve = new THREE.CatmullRomCurve3(pts, true, "catmullrom", 0.5);
     const rimMesh = new THREE.Mesh(
-      new THREE.TubeGeometry(frameCurve, 72, 0.019 * S, 16, true),
+      new THREE.TubeGeometry(frameCurve, 56, 0.014 * S, 14, true),
       frameMat
     );
     rimMesh.castShadow = true;
     group.add(rimMesh);
 
-    // Subtle clear lens plane curved inside rim
-    const gridN = 6;
-    const pos: number[] = [];
-    const idx: number[] = [];
-    for (let iy = 0; iy <= gridN; iy++) {
-      const ny = ((iy / gridN) * 2 - 1) * 0.88;
-      for (let ix = 0; ix <= gridN; ix++) {
-        const nx = ((ix / gridN) * 2 - 1) * 0.88;
-        const px = cx + nx * halfW * 0.92;
-        const py = centerY + ny * halfH * 0.92;
-        const pz = eyewearZ(px, py) - 0.004;
-        pos.push(px * S, py * S, pz * S);
-      }
-    }
-    for (let iy = 0; iy < gridN; iy++) {
-      for (let ix = 0; ix < gridN; ix++) {
-        const a = iy * (gridN + 1) + ix;
-        const b = a + 1;
-        const c = a + (gridN + 1);
-        const d = c + 1;
-        idx.push(a, b, d, a, d, c);
-      }
-    }
-    const lGeo = new THREE.BufferGeometry();
-    lGeo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
-    lGeo.setIndex(idx);
-    lGeo.computeVertexNormals();
-    group.add(new THREE.Mesh(lGeo, clearLensMat));
-
-    // Cute side hinge lug + short temple tucking into side of wide head
-    const outerX = side * (centerX + halfW * 1.02);
-    const outerY = centerY + 0.015;
+    const outerX = side * (centerX + halfW);
+    const outerY = centerY + 0.01;
     const outerZ = eyewearZ(outerX, outerY);
-    const lug = new THREE.Mesh(
-      new THREE.BoxGeometry(0.028 * S, 0.036 * S, 0.032 * S),
-      frameMat
-    );
-    lug.position.set(outerX * S, outerY * S, outerZ * S);
-    lug.rotation.y = side * 0.28;
-    group.add(lug);
-
-    const endSurfX = findSurfaceX(outerY - 0.01, 0.04);
+    const endSurfX = findSurfaceX(outerY, -0.04);
     const templeCurve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(outerX * S, outerY * S, outerZ * S),
-      new THREE.Vector3(side * (endSurfX + 0.01) * S, outerY * S, 0.16 * S),
-      new THREE.Vector3(side * (endSurfX - 0.01) * S, (outerY - 0.01) * S, 0.02 * S),
+      new THREE.Vector3(side * (endSurfX + 0.01) * S, outerY * S, 0.06 * S),
+      new THREE.Vector3(side * (endSurfX - 0.005) * S, outerY * S, -0.06 * S),
     ]);
     group.add(
-      new THREE.Mesh(new THREE.TubeGeometry(templeCurve, 16, 0.015 * S, 12, false), frameMat)
+      new THREE.Mesh(new THREE.TubeGeometry(templeCurve, 14, 0.012 * S, 10, false), frameMat)
     );
   });
 
-  // Continuous Bold Brow-Bridge Arch connecting the top-inner corners smoothly over the big round nose!
+  // Bridge arching cleanly over the snout root!
   const browPts: THREE.Vector3[] = [];
-  const spanX = centerX - halfW * 0.65;
+  const spanX = centerX - halfW * 0.72;
   for (let i = 0; i <= 16; i++) {
     const u = (i / 16) * 2 - 1;
     const bx = u * spanX;
-    const archY = centerY + halfH * 0.88 + (1 - u * u) * 0.016;
-    const bz = Math.max(eyewearZ(bx, archY), 0.448 - 0.35 * bx * bx);
+    const archY = centerY + halfH * 0.65 + (1 - u * u) * 0.052;
+    const bz = findFaceSurfaceZ(bx, archY) + 0.018;
     browPts.push(new THREE.Vector3(bx * S, archY * S, bz * S));
   }
   const browMesh = new THREE.Mesh(
-    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(browPts), 28, 0.020 * S, 14, false),
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(browPts), 24, 0.014 * S, 12, false),
     frameMat
   );
   browMesh.castShadow = true;
@@ -518,7 +586,7 @@ export function buildDetailedGlasses(S: number, eyeY: number): THREE.Group {
 }
 
 /**
- * Ribbed Knitted Winter Beanie fitted between wide-set ears
+ * Ribbed Knitted Winter Beanie fitted between upright fox ears
  */
 export function buildKnittedBeanie(S: number): THREE.Group {
   const group = new THREE.Group();
@@ -542,28 +610,28 @@ export function buildKnittedBeanie(S: number): THREE.Group {
 
   const sub = new THREE.Group();
   const dome = new THREE.Mesh(
-    new THREE.SphereGeometry(0.18 * S, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.58),
+    new THREE.SphereGeometry(0.128 * S, 24, 18, 0, Math.PI * 2, 0, Math.PI * 0.58),
     hatMat
   );
   const cuff = new THREE.Mesh(
-    new THREE.TorusGeometry(0.175 * S, 0.038 * S, 16, 36),
+    new THREE.TorusGeometry(0.125 * S, 0.028 * S, 14, 32),
     cuffMat
   );
   cuff.rotation.x = Math.PI / 2;
-  cuff.position.y = 0.012 * S;
+  cuff.position.y = 0.01 * S;
 
   const pomGroup = new THREE.Group();
-  pomGroup.position.set(0, 0.195 * S, 0);
-  pomGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.052 * S, 16, 16), pomMat));
+  pomGroup.position.set(0, 0.145 * S, 0);
+  pomGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.038 * S, 14, 14), pomMat));
   sub.add(dome, cuff, pomGroup);
-  sub.position.set(0, 0.44 * S, -0.02 * S);
-  sub.rotation.x = -0.14;
+  sub.position.set(0, 0.435 * S, -0.05 * S);
+  sub.rotation.x = -0.1;
   group.add(sub);
   return group;
 }
 
 /**
- * Plush Earmuffs
+ * Plush Earmuffs fitted to standing head
  */
 export function buildPlushEarmuffs(S: number): THREE.Group {
   const group = new THREE.Group();
@@ -572,24 +640,27 @@ export function buildPlushEarmuffs(S: number): THREE.Group {
   const whiteFleece = new THREE.MeshStandardMaterial({ color: 0xfffdf9, roughness: 0.96 });
 
   const bandCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-0.39 * S, 0.34 * S, 0),
-    new THREE.Vector3(-0.28 * S, 0.52 * S, 0),
-    new THREE.Vector3(0, 0.56 * S, 0),
-    new THREE.Vector3(0.28 * S, 0.52 * S, 0),
-    new THREE.Vector3(0.39 * S, 0.34 * S, 0),
+    new THREE.Vector3(-0.27 * S, 0.34 * S, -0.06 * S),
+    new THREE.Vector3(-0.22 * S, 0.50 * S, -0.06 * S),
+    new THREE.Vector3(0, 0.54 * S, -0.06 * S),
+    new THREE.Vector3(0.22 * S, 0.50 * S, -0.06 * S),
+    new THREE.Vector3(0.27 * S, 0.34 * S, -0.06 * S),
   ]);
-  group.add(new THREE.Mesh(new THREE.TubeGeometry(bandCurve, 28, 0.02, 12, false), bandMat));
+  group.add(new THREE.Mesh(new THREE.TubeGeometry(bandCurve, 28, 0.016 * S, 12, false), bandMat));
 
   [-1, 1].forEach((side) => {
     const cup = new THREE.Group();
-    const cushion = new THREE.Mesh(new THREE.TorusGeometry(0.072 * S, 0.036 * S, 14, 24), whiteFleece);
+    const cushion = new THREE.Mesh(
+      new THREE.TorusGeometry(0.058 * S, 0.028 * S, 14, 24),
+      whiteFleece
+    );
     cushion.rotation.y = Math.PI / 2;
-    const outer = new THREE.Mesh(new THREE.SphereGeometry(0.092 * S, 20, 20), pinkPlush);
+    const outer = new THREE.Mesh(new THREE.SphereGeometry(0.075 * S, 20, 20), pinkPlush);
     outer.scale.set(0.58, 1, 1);
-    outer.position.x = side * 0.02 * S;
+    outer.position.x = side * 0.018 * S;
     cup.add(cushion, outer);
-    cup.position.set(side * 0.39 * S, 0.33 * S, 0);
-    cup.rotation.z = -side * 0.15;
+    cup.position.set(side * 0.275 * S, 0.33 * S, -0.06 * S);
+    cup.rotation.z = -side * 0.12;
     group.add(cup);
   });
 
@@ -629,9 +700,6 @@ export function buildCuteCodfish(): THREE.Group {
   return g;
 }
 
-/**
- * Radial Soft Glow Texture for Sparkling Room Treasures!
- */
 let cachedGlowTex: THREE.CanvasTexture | null = null;
 function getTreasureGlowTexture(): THREE.CanvasTexture {
   if (cachedGlowTex) return cachedGlowTex;
@@ -651,7 +719,7 @@ function getTreasureGlowTexture(): THREE.CanvasTexture {
   return cachedGlowTex;
 }
 
-function createStarSparkleGeometry(radius = 0.055): THREE.ShapeGeometry {
+function createStarSparkleGeometry(radius = 0.026): THREE.ShapeGeometry {
   const s = new THREE.Shape();
   const inner = radius * 0.24;
   for (let i = 0; i < 8; i++) {
@@ -667,7 +735,7 @@ function createStarSparkleGeometry(radius = 0.055): THREE.ShapeGeometry {
 }
 
 /**
- * Builds an Eye-Catching Sparkling 3D Room Treasure Pod (Glow Halo + 3D Prop + Twinkling Stars + Hit Sphere)!
+ * Delicate, Grounded Miniature 3D Room Treasure Pod (bottom strictly at y >= 0, subtle low-key shimmer)
  */
 export function buildSparklingRoomTreasure(kind: string, slotIndex: number): {
   root: THREE.Group;
@@ -680,138 +748,138 @@ export function buildSparklingRoomTreasure(kind: string, slotIndex: number): {
   const propGroup = new THREE.Group();
   root.add(propGroup);
 
-  // 1. Soft Shimmering Floor Halo + Upright Aura Sprite
   const haloMat = new THREE.MeshBasicMaterial({
     map: getTreasureGlowTexture(),
     transparent: true,
-    opacity: 0.85,
+    opacity: 0.36,
     depthWrite: false,
-    blending: THREE.AdditiveBlending,
   });
-  const haloMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.68), haloMat);
+  const haloMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.30, 0.30), haloMat);
   haloMesh.rotation.x = -Math.PI / 2;
-  haloMesh.position.y = 0.02;
+  haloMesh.position.y = 0.005;
   root.add(haloMesh);
 
-  const backAura = new THREE.Mesh(
-    new THREE.PlaneGeometry(0.58, 0.58),
-    new THREE.MeshBasicMaterial({
-      map: getTreasureGlowTexture(),
-      transparent: true,
-      opacity: 0.55,
-      depthWrite: false,
-      blending: THREE.AdditiveBlending,
-    })
-  );
-  backAura.position.set(0, 0.20, -0.04);
-  root.add(backAura);
-
-  // 2. Sculpted Cute 3D Treasure Prop
   const goldMat = new THREE.MeshStandardMaterial({
     color: 0xfde047,
     emissive: 0xf59e0b,
-    emissiveIntensity: 0.32,
-    roughness: 0.35,
+    emissiveIntensity: 0.14,
+    roughness: 0.44,
   });
   const creamMat = new THREE.MeshStandardMaterial({
     color: 0xfffbeb,
     emissive: 0xfef3c7,
-    emissiveIntensity: 0.22,
-    roughness: 0.5,
+    emissiveIntensity: 0.10,
+    roughness: 0.55,
   });
   const coralMat = new THREE.MeshStandardMaterial({
     color: 0xfb7185,
     emissive: 0xf43f5e,
-    emissiveIntensity: 0.2,
-    roughness: 0.4,
+    emissiveIntensity: 0.08,
+    roughness: 0.48,
   });
   const skyGlowMat = new THREE.MeshStandardMaterial({
     color: 0x7dd3fc,
     emissive: 0x38bdf8,
-    emissiveIntensity: 0.3,
-    roughness: 0.25,
+    emissiveIntensity: 0.14,
+    roughness: 0.34,
   });
+
+  const mini = new THREE.Group();
+  const P = 0.54;
 
   if (kind === "fish") {
     const fish = buildCuteCodfish();
-    fish.scale.setScalar(1.15);
-    fish.rotation.y = -0.3;
-    fish.rotation.z = 0.18;
-    propGroup.add(fish);
+    fish.scale.setScalar(0.85 * P);
+    fish.rotation.x = 0.5;
+    fish.rotation.y = -0.35;
+    fish.position.y = 0.065 * P;
+    mini.add(fish);
   } else if (kind === "card" || kind === "plane") {
-    // Warm glowing letter card with cute coral wax seal!
-    const card = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.20, 0.026), creamMat);
-    card.rotation.z = 0.14;
-    card.rotation.x = -0.25;
-    const seal = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.032, 16), coralMat);
-    seal.rotation.x = Math.PI / 2 - 0.25;
-    seal.position.set(0, 0, 0.012);
-    propGroup.add(card, seal);
-  } else if (kind === "cocoa") {
-    const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.095, 0.20, 20), coralMat);
-    const foam = new THREE.Mesh(new THREE.SphereGeometry(0.098, 16, 12), creamMat);
-    foam.scale.set(1, 0.4, 1);
-    foam.position.y = 0.09;
-    propGroup.add(mug, foam);
-  } else if (kind === "shell" || kind === "acorn") {
-    const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 16), goldMat);
-    pearl.scale.set(1.15, 0.85, 0.9);
-    const cap = new THREE.Mesh(
-      new THREE.SphereGeometry(0.135, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.48),
+    const card = new THREE.Mesh(new THREE.BoxGeometry(0.25 * P, 0.025 * P, 0.18 * P), creamMat);
+    card.position.y = 0.014 * P;
+    card.rotation.y = 0.28;
+    const seal = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.035 * P, 0.035 * P, 0.018 * P, 16),
       coralMat
     );
-    cap.position.y = 0.02;
-    propGroup.add(pearl, cap);
+    seal.position.set(0, 0.028 * P, 0);
+    mini.add(card, seal);
+  } else if (kind === "cocoa") {
+    const mug = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.10 * P, 0.088 * P, 0.18 * P, 20),
+      coralMat
+    );
+    mug.position.y = 0.09 * P;
+    const foam = new THREE.Mesh(new THREE.SphereGeometry(0.09 * P, 16, 12), creamMat);
+    foam.scale.set(1, 0.38, 1);
+    foam.position.y = 0.175 * P;
+    mini.add(mug, foam);
+  } else if (kind === "shell" || kind === "acorn") {
+    const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.11 * P, 20, 16), goldMat);
+    pearl.scale.set(1.12, 0.82, 0.92);
+    pearl.position.y = 0.092 * P;
+    const cap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.115 * P, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.48),
+      coralMat
+    );
+    cap.position.y = 0.105 * P;
+    mini.add(pearl, cap);
   } else {
-    // Glowing Aurora Star Jar / Crystal / Golden Bell
     const jarGlass = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.11, 0.125, 0.23, 20),
+      new THREE.CylinderGeometry(0.098 * P, 0.112 * P, 0.19 * P, 20),
       new THREE.MeshStandardMaterial({
         color: 0xe0f2fe,
         transparent: true,
-        opacity: 0.58,
-        roughness: 0.12,
+        opacity: 0.65,
+        roughness: 0.18,
       })
     );
-    const innerStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.075, 0), goldMat);
-    const cork = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.09, 0.045, 16), coralMat);
-    cork.position.y = 0.125;
-    const glowCore = new THREE.Mesh(new THREE.SphereGeometry(0.055, 14, 14), skyGlowMat);
-    glowCore.position.y = -0.02;
-    propGroup.add(jarGlass, innerStar, cork, glowCore);
+    jarGlass.position.y = 0.096 * P;
+    const innerStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.06 * P, 0), goldMat);
+    innerStar.position.y = 0.096 * P;
+    const cork = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.075 * P, 0.08 * P, 0.038 * P, 16),
+      coralMat
+    );
+    cork.position.y = 0.20 * P;
+    const glowCore = new THREE.Mesh(new THREE.SphereGeometry(0.04 * P, 14, 14), skyGlowMat);
+    glowCore.position.y = 0.08 * P;
+    mini.add(jarGlass, innerStar, cork, glowCore);
   }
-  propGroup.position.y = 0.21;
 
-  // 3. Three Twinkling 4-Point Diamond Sparkles around the prop!
-  const starGeo = createStarSparkleGeometry(0.052);
-  const starMatWhite = new THREE.MeshBasicMaterial({
-    color: 0xffffff,
-    side: THREE.DoubleSide,
-  });
+  propGroup.add(mini);
+  propGroup.position.y = 0.01;
+
+  const starGeo = createStarSparkleGeometry(0.024);
   const starMatGold = new THREE.MeshBasicMaterial({
     color: 0xfef08a,
+    transparent: true,
+    opacity: 0.82,
+    side: THREE.DoubleSide,
+  });
+  const starMatWhite = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    transparent: true,
+    opacity: 0.82,
     side: THREE.DoubleSide,
   });
 
   const stars: THREE.Mesh[] = [];
-  const starOffsets = [
-    { x: -0.18, y: 0.36, z: 0.08 },
-    { x: 0.19, y: 0.28, z: 0.10 },
-    { x: 0.03, y: 0.44, z: 0.06 },
-  ];
-  starOffsets.forEach((so, idx) => {
+  [
+    { x: -0.085, y: 0.175, z: 0.04 },
+    { x: 0.095, y: 0.14, z: 0.05 },
+  ].forEach((so, idx) => {
     const st = new THREE.Mesh(starGeo, idx % 2 === 0 ? starMatGold : starMatWhite);
     st.position.set(so.x, so.y, so.z);
     root.add(st);
     stars.push(st);
   });
 
-  // 4. Generous Invisible Raycast Sphere (`hoard_0`, `hoard_1`, `hoard_2`)
   const hitMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.32, 12, 12),
+    new THREE.SphereGeometry(0.24, 12, 12),
     new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
   );
-  hitMesh.position.y = 0.22;
+  hitMesh.position.y = 0.10;
   hitMesh.name = `hoard_${slotIndex}`;
   root.add(hitMesh);
 
