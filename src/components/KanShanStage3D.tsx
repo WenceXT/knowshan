@@ -613,20 +613,25 @@ export default function KanShanStage3D({
       sp.treasureScale += (1 - sp.treasureScale) * 0.12;
       treasuresGroup.scale.setScalar(sp.treasureScale);
 
-      // Animate Subtle Grounded Room Treasures
+      // Animate Gently Floating Room Treasures with Soft Breathing Halo (Zero harsh strobing & zero clipping!)
       activePods.forEach((pod, idx) => {
-        const phase = t * 2.1 + idx * 2.1;
-        pod.propGroup.position.y = 0.01 + (Math.sin(phase) + 1) * 0.006;
-        pod.propGroup.rotation.y = Math.sin(t * 0.8 + idx) * 0.2;
+        const phase = t * 1.75 + idx * 2.1;
+        // Floats smoothly between y = 0.14 and y = 0.20 (well above rug/sofa surface!)
+        pod.propGroup.position.y = 0.17 + Math.sin(phase) * 0.032;
+        pod.propGroup.rotation.y = Math.sin(t * 0.75 + idx) * 0.25;
 
-        const haloPulse = 0.94 + Math.sin(phase * 1.1) * 0.07;
+        const haloPulse = 0.95 + Math.sin(phase) * 0.08;
         pod.haloMesh.scale.set(haloPulse, haloPulse, 1);
 
+        pod.auraMesh.position.y = 0.21 + Math.sin(phase) * 0.02;
+        pod.auraMesh.lookAt(camera.position);
+
         pod.stars.forEach((star, sIdx) => {
-          const spPhase = t * 3.6 + idx * 1.7 + sIdx * 2.1;
-          const twinkle = Math.max(0.2, (Math.sin(spPhase) + 1) * 0.42);
-          star.scale.setScalar(twinkle);
-          star.rotation.z = t * 0.9 + sIdx;
+          // Gentle, calm starlight breathing (0.55 .. 0.92) instead of rapid flashing!
+          const spPhase = t * 1.85 + idx * 1.4 + sIdx * 1.9;
+          const calmBreath = 0.72 + Math.sin(spPhase) * 0.20;
+          star.scale.setScalar(calmBreath);
+          star.rotation.z = Math.sin(t * 0.6 + sIdx) * 0.25;
           star.lookAt(camera.position);
         });
       });

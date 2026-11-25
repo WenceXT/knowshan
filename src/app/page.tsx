@@ -2,15 +2,21 @@
 
 import React, { useEffect, useRef, useState } from "react";
 import dynamic from "next/dynamic";
-import { AccessoryItem, HoardedItem, KnowShanStore, ZhihuQuestion } from "@/types/knowshan";
-import KanShanStage2D from "@/components/KanShanStage2D";
 import {
-  apiGenerateDraft,
+  AccessoryItem,
+  HoardedItem,
+  KnowShanStore,
+  SnowballCreationMode,
+} from "@/types/knowshan";
+import KanShanStage2D from "@/components/KanShanStage2D";
+import SnowballCreationSheet from "@/components/SnowballCreationSheet";
+import BurrowChatModal from "@/components/BurrowChatModal";
+import {
+  apiAddDollVoiceRecord,
+  apiConfirmSnowballPublished,
   apiGetState,
   apiPostState,
-  apiPublishSnowman,
-  apiSendBubble,
-  apiSubmitWhisper,
+  apiSelectChatSession,
 } from "@/lib/client-api";
 
 const BASE_PATH = process.env.NEXT_PUBLIC_BASE_PATH || "";
@@ -23,10 +29,9 @@ const KanShanStage3D = dynamic(() => import("@/components/KanShanStage3D"), {
 type DrawerType =
   | null
   | "wardrobe"
-  | "whisper"
-  | "bubble"
-  | "diary"
+  | "burrow"
   | "snowman"
+  | "nose_voice"
   | "treasure"
   | "replies"
   | "settings";
@@ -70,22 +75,12 @@ const MBTI_MENU_GROUPS = [
   },
 ];
 
-const VOICE_PRESETS = [
-  {
-    short: "下午汇报忘词了",
-    full: "今天下午在新闻学院张老师的传播学专业课做小组 Pre 搞砸了，上台忘词声音都在抖，回宿舍还是好难受……",
-  },
-  {
-    short: "熬到现在还没睡",
-    full: "一个人熬到十二点半还没睡，白天装得像没事人一样，其实有点累。",
-  },
-  {
-    short: "写了半天又删了",
-    full: "备忘录里攒了好多话，每次点开发布框又默默删掉了。",
-  },
+const NOSE_VOICE_PRESETS = [
+  "今天下午在新闻学院张老师的传播学专业课做小组 Pre 忘词了，手心一直在出汗……",
+  "刚收到两个实习面试通知，纠结选喜欢的方向还是补贴更高的岗位。",
+  "一个人熬到十二点半还没睡，想对着看山叹口气再关灯。",
 ];
 
-// Hand-crafted soft vector icons for wardrobe & sparkling hoard items (zero system emojis!)
 function ItemVectorIcon({ id }: { id: string }) {
   switch (id) {
     case "thick_glasses":
@@ -154,8 +149,6 @@ function ItemVectorIcon({ id }: { id: string }) {
           <rect x="8" y="13" width="17" height="16" rx="5" fill="#fb7185" />
           <ellipse cx="16.5" cy="14" rx="7.5" ry="3" fill="#fffbeb" />
           <path d="M25 16 A4 4 0 0 1 25 25" fill="none" stroke="#fb7185" strokeWidth="2.8" />
-          <path d="M14 7 Q15.5 9.5 14 11" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
-          <path d="M19 6 Q20.5 8.5 19 10.5" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
         </svg>
       );
     case "plane":
@@ -169,9 +162,6 @@ function ItemVectorIcon({ id }: { id: string }) {
       return (
         <svg viewBox="0 0 36 36" className="w-8 h-8">
           <path d="M7 22 C7 11 29 11 29 22 L24 28 L12 28 Z" fill="#fbcfe8" stroke="#f472b6" strokeWidth="2" strokeLinejoin="round" />
-          <line x1="18" y1="13" x2="18" y2="27" stroke="#f472b6" strokeWidth="1.6" />
-          <line x1="13" y1="15" x2="15" y2="27" stroke="#f472b6" strokeWidth="1.6" />
-          <line x1="23" y1="15" x2="21" y2="27" stroke="#f472b6" strokeWidth="1.6" />
         </svg>
       );
     case "bell":
@@ -185,14 +175,11 @@ function ItemVectorIcon({ id }: { id: string }) {
       return (
         <svg viewBox="0 0 36 36" className="w-8 h-8">
           <polygon points="18,5 27,15 23,29 13,29 9,15" fill="#a5f3fc" stroke="#38bdf8" strokeWidth="2" strokeLinejoin="round" />
-          <polyline points="9,15 18,19 27,15" fill="none" stroke="#0284c7" strokeWidth="1.6" />
-          <line x1="18" y1="5" x2="18" y2="29" stroke="#0284c7" strokeWidth="1.6" />
         </svg>
       );
     case "acorn":
       return (
         <svg viewBox="0 0 36 36" className="w-8 h-8">
-          <path d="M18 6 L18 10" stroke="#78350f" strokeWidth="2.6" strokeLinecap="round" />
           <ellipse cx="18" cy="13.5" rx="10" ry="4.8" fill="#92400e" />
           <path d="M10 15 C10 26 18 30 18 30 C18 30 26 26 26 15 Z" fill="#f59e0b" />
         </svg>
@@ -201,7 +188,6 @@ function ItemVectorIcon({ id }: { id: string }) {
       return (
         <svg viewBox="0 0 36 36" className="w-8 h-8">
           <circle cx="18" cy="18" r="10" fill="#fde047" />
-          <circle cx="15" cy="15" r="3" fill="#fef9c3" />
         </svg>
       );
   }
@@ -217,30 +203,31 @@ export default function CozyKnowShanApp() {
   const [renderMode, setRenderMode] = useState<"3d" | "2d">("3d");
   const [toast, setToast] = useState<string | null>(null);
 
-  const [whisperInput, setWhisperInput] = useState("");
-  const [chatInput, setChatInput] = useState("");
-  const [busy, setBusy] = useState(false);
   const [selectedHoard, setSelectedHoard] = useState<HoardedItem | null>(null);
   const [mbtiMenuOpen, setMbtiMenuOpen] = useState(true);
 
-  const [draftInfo, setDraftInfo] = useState<{
-    rawDraft: string;
-    desensitizedDraft: string;
-    redactedTerms: string[];
-    question: ZhihuQuestion;
-  } | null>(null);
-  const [hideNames, setHideNames] = useState(true);
-  const [postText, setPostText] = useState("");
-  const [copied, setCopied] = useState(false);
+  // Module A: Snowball Random 3-Mode Creation State
+  const [snowballMode, setSnowballMode] = useState<SnowballCreationMode>("answer");
+  const [preferredSnowSessionId, setPreferredSnowSessionId] = useState<string | undefined>(
+    undefined
+  );
+
+  // Doll Nose Voice Capture State
+  const [noseTranscript, setNoseTranscript] = useState("");
+  const [noseDurationSec, setNoseDurationSec] = useState(5);
+  const [noseAudioUrl, setNoseAudioUrl] = useState<string | undefined>(undefined);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const recRef = useRef<any>(null);
+  const mediaRecRef = useRef<MediaRecorder | null>(null);
+  const audioChunksRef = useRef<Blob[]>([]);
+  const noseStartMsRef = useRef<number>(0);
 
   const showToast = (msg: string) => {
     setToast(msg);
     setTimeout(() => {
       setToast((prev) => (prev === msg ? null : prev));
-    }, 2500);
+    }, 2600);
   };
 
   useEffect(() => {
@@ -262,7 +249,7 @@ export default function CozyKnowShanApp() {
         rec.onresult = (e: any) => {
           let t = "";
           for (let i = 0; i < e.results.length; i++) t += e.results[i][0].transcript;
-          if (t) setWhisperInput(t);
+          if (t) setNoseTranscript(t);
         };
         recRef.current = rec;
       }
@@ -280,30 +267,109 @@ export default function CozyKnowShanApp() {
     return d.store as KnowShanStore | null;
   };
 
-  const handleNoseStart = () => {
+  // =====================================================================
+  // 3D / 2D DOLL NOSE RECORDING -> SYNCS INTO BURROW "来自玩偶的声音"
+  // =====================================================================
+  const handleNoseStart = async () => {
     setIsRecordingNose(true);
-    showToast("正在听你说悄悄话…");
+    setNoseTranscript("");
+    setNoseAudioUrl(undefined);
+    noseStartMsRef.current = Date.now();
+    showToast("正在对刘看山玩偶说悄悄话…");
+
     try {
       recRef.current?.start();
     } catch {
       // ignore
+    }
+
+    if (typeof navigator !== "undefined" && navigator.mediaDevices?.getUserMedia) {
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+        audioChunksRef.current = [];
+        const mr = new MediaRecorder(stream);
+        mr.ondataavailable = (ev) => {
+          if (ev.data.size > 0) audioChunksRef.current.push(ev.data);
+        };
+        mr.onstop = () => {
+          stream.getTracks().forEach((t) => t.stop());
+          if (audioChunksRef.current.length > 0) {
+            const blob = new Blob(audioChunksRef.current, { type: "audio/webm" });
+            setNoseAudioUrl(URL.createObjectURL(blob));
+          }
+        };
+        mr.start();
+        mediaRecRef.current = mr;
+      } catch {
+        // ignore
+      }
     }
   };
 
   const handleNoseEnd = () => {
     if (!isRecordingNose) return;
     setIsRecordingNose(false);
+    const dur = Math.max(2, Math.round((Date.now() - noseStartMsRef.current) / 1000));
+    setNoseDurationSec(dur);
+
     try {
       recRef.current?.stop();
     } catch {
       // ignore
     }
-    setDrawer("whisper");
+    try {
+      mediaRecRef.current?.stop();
+    } catch {
+      // ignore
+    }
+    setDrawer("nose_voice");
+  };
+
+  const handleSaveNoseVoice = async () => {
+    const text = noseTranscript.trim();
+    if (!text) return;
+    const res = await apiAddDollVoiceRecord({
+      transcript: text,
+      durationSec: noseDurationSec,
+      audioUrl: noseAudioUrl,
+    });
+    setStore(res.store);
+    setNoseTranscript("");
+    setDrawer(null);
+    showToast("玩偶语音已同步进树洞「来自玩偶的声音」！");
+  };
+
+  // =====================================================================
+  // SNOWBALL CLICK -> RANDOM 1/3 SELECTION OF (ASK / ANSWER / POST)
+  // =====================================================================
+  const openRandomSnowmanCreation = (fromSessionId?: string) => {
+    const modes: SnowballCreationMode[] = ["ask", "answer", "post"];
+    const randomMode = modes[Math.floor(Math.random() * modes.length)];
+    setSnowballMode(randomMode);
+    setPreferredSnowSessionId(fromSessionId);
+    setDrawer("snowman");
+  };
+
+  const handleConfirmSnowballPublished = async (payload: {
+    creationType: SnowballCreationMode;
+    questionId: string;
+    title: string;
+    content: string;
+    desensitized: boolean;
+    redactedTerms: string[];
+  }) => {
+    const res = await apiConfirmSnowballPublished(payload);
+    setStore(res.store);
+    setDrawer("replies");
+    // Joyful celebration hop + codfish reward!
+    setIsHuntingTreasure(true);
+    showToast("庆祝成功！雪球化作一条小银鳕鱼，经验 +120！");
+    setTimeout(() => setIsHuntingTreasure(false), 1200);
   };
 
   const handleFeedCodfish = async () => {
-    await postState({ action: "hardware_interact", interactType: "head_pat" });
-    showToast("喂了一小块银鳕鱼");
+    await postState({ action: "hardware_interact", interactType: "feed_codfish" });
+    showToast("喂了一小块银鳕鱼，看山开心地摇了摇尾巴");
   };
 
   const handleSelectHoardInRoom = (item: HoardedItem) => {
@@ -321,69 +387,8 @@ export default function CozyKnowShanApp() {
     }
     setTimeout(() => {
       setIsHuntingTreasure(false);
-      showToast("叼回三件闪闪发光的新小物件，点地上看看吧");
+      showToast("叼回三件散发微光的新小物件，点屋里看看吧");
     }, 850);
-  };
-
-  const submitWhisper = async () => {
-    if (!whisperInput.trim()) return;
-    setBusy(true);
-    try {
-      const d = await apiSubmitWhisper(whisperInput.trim(), "web_diary");
-      if (d.store) {
-        setStore(d.store);
-        setWhisperInput("");
-        setDrawer(null);
-        showToast("看山听完拍了拍雪球，冒出了一个新提问");
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const sendChat = async (quick?: string) => {
-    if (!store) return;
-    const text = (quick ?? chatInput).trim();
-    if (!text) return;
-    setBusy(true);
-    setChatInput("");
-    try {
-      const d = await apiSendBubble(store.activeQuestionId, text);
-      if (d.store) {
-        setStore(d.store);
-      }
-    } finally {
-      setBusy(false);
-    }
-  };
-
-  const openSnowmanLetter = async () => {
-    if (!store) return;
-    const info = await apiGenerateDraft(store.activeQuestionId);
-    setDraftInfo(info);
-    setHideNames(true);
-    setPostText(info.desensitizedDraft);
-    setDrawer("snowman");
-  };
-
-  const publishSnowman = async () => {
-    if (!draftInfo || !postText.trim()) return;
-    setBusy(true);
-    try {
-      const d = await apiPublishSnowman({
-        questionId: draftInfo.question.id,
-        content: postText,
-        desensitized: hideNames,
-        redactedTerms: draftInfo.redactedTerms,
-      });
-      if (d.store) {
-        setStore(d.store);
-        setDrawer("replies");
-        showToast("寄出啦，收到了暖心回应");
-      }
-    } finally {
-      setBusy(false);
-    }
   };
 
   if (!store) {
@@ -392,7 +397,6 @@ export default function CozyKnowShanApp() {
 
   const activeQ =
     store.questions.find((q) => q.id === store.activeQuestionId) || store.questions[0];
-  const activeMsgs = store.dialogues[activeQ.id] || [];
   const activeQuestionBubble =
     store.whispers[0]?.bubbleQuestion || activeQ.bubblePrompt || activeQ.title;
   const coinDisplay = `${((store.pet.exp * 15 + 200) / 1000).toFixed(1)}k`;
@@ -400,7 +404,7 @@ export default function CozyKnowShanApp() {
 
   return (
     <div className="h-screen w-screen overflow-hidden bg-gradient-to-br from-[#adc8ec] via-[#cde1f9] to-[#aac6eb] flex items-center justify-center select-none">
-      {/* Subtle Screen Frame & 3D/2D Switcher on Desktop */}
+      {/* Screen Frame & 3D/2D Switcher on Desktop */}
       <div className="hidden sm:flex fixed top-4 right-4 z-50 items-center gap-2">
         <div className="flex items-center p-1 rounded-full bg-[#fdfbf7]/85 backdrop-blur-md shadow-xs">
           <button
@@ -434,7 +438,7 @@ export default function CozyKnowShanApp() {
       </div>
 
       {/* =============================================================== */}
-      {/* MAIN STAGE (Instant resize via ResizeObserver — never clips!)   */}
+      {/* MAIN STAGE                                                      */}
       {/* =============================================================== */}
       <div
         className={`relative overflow-hidden bg-gradient-to-b from-[#bdd6f4] via-[#ddebfb] to-[#b5d2f3] ${
@@ -443,7 +447,7 @@ export default function CozyKnowShanApp() {
             : "w-full max-w-[430px] h-[100dvh] sm:h-[92vh] sm:max-h-[900px] sm:rounded-[46px] sm:border-[6px] sm:border-white/90 sm:shadow-[0_24px_80px_rgba(56,89,138,0.22)]"
         }`}
       >
-        {/* Frosty Window Sunlight & Subtle Vector Snowflakes */}
+        {/* Frosty Window Sunlight */}
         <div className="pointer-events-none absolute inset-0 overflow-hidden">
           <div
             className="absolute -top-24 left-10 w-[82%] h-[62%] opacity-65 blur-2xl"
@@ -453,23 +457,9 @@ export default function CozyKnowShanApp() {
               transform: "skewX(-16deg)",
             }}
           />
-          <svg
-            viewBox="0 0 32 32"
-            className="absolute bottom-44 right-5 w-6 h-6 text-white/55"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          >
-            <line x1="16" y1="4" x2="16" y2="28" />
-            <line x1="5.6" y1="10" x2="26.4" y2="22" />
-            <line x1="26.4" y1="10" x2="5.6" y2="22" />
-          </svg>
         </div>
 
-        {/* ============================================================= */}
-        {/* STATUS BAR (Rounded Soft Numerals)                            */}
-        {/* ============================================================= */}
+        {/* STATUS BAR */}
         <div className="relative z-20 px-7 pt-3 pb-0.5 flex items-center justify-between text-[14px] font-semibold text-[#1e293b]">
           <div className="flex items-center gap-1.5">
             <span>00:32</span>
@@ -486,11 +476,8 @@ export default function CozyKnowShanApp() {
           </div>
         </div>
 
-        {/* ============================================================= */}
-        {/* TOP HEADER ROW                                                */}
-        {/* ============================================================= */}
+        {/* TOP HEADER ROW */}
         <div className="relative z-20 px-4 pt-2 flex items-center justify-between gap-2.5 max-w-xl mx-auto">
-          {/* Back Circle */}
           <button
             onClick={() => {
               if (drawer) setDrawer(null);
@@ -502,7 +489,7 @@ export default function CozyKnowShanApp() {
             </svg>
           </button>
 
-          {/* Center Profile Pill */}
+          {/* Center Profile Pill (Opens 16-MBTI Menu!) */}
           <button
             onClick={() => setDrawer("settings")}
             className="flex-1 h-13 rounded-full bg-[#fdfbf7]/95 shadow-[0_3px_12px_rgba(120,150,190,0.16)] px-2.5 flex items-center justify-between gap-2 active:scale-[0.99] transition cursor-pointer"
@@ -522,7 +509,6 @@ export default function CozyKnowShanApp() {
               </div>
             </div>
 
-            {/* Concentric Mood Rings */}
             <svg viewBox="0 0 36 36" className="w-9 h-9 shrink-0">
               <circle cx="18" cy="18" r="14.5" fill="none" stroke="#e0f2fe" strokeWidth="3.2" />
               <circle cx="18" cy="18" r="14.5" fill="none" stroke="#4cc3f7" strokeWidth="3.2" strokeDasharray="74 100" strokeLinecap="round" />
@@ -550,13 +536,11 @@ export default function CozyKnowShanApp() {
           </button>
         </div>
 
-        {/* ============================================================= */}
-        {/* SUB-HEADER ROW (Share | Plump Star + Paw + Coin | Clean Balance) */}
-        {/* ============================================================= */}
+        {/* SUB-HEADER ROW */}
         <div className="relative z-20 px-4 pt-2.5 flex items-center justify-between gap-2 max-w-xl mx-auto">
-          {/* Share / Letter Button */}
           <button
-            onClick={openSnowmanLetter}
+            onClick={() => openRandomSnowmanCreation()}
+            title="雪球随机创作"
             className="w-11 h-11 rounded-full bg-[#fdfbf7]/95 shadow-[0_3px_10px_rgba(120,150,190,0.18)] flex items-center justify-center active:scale-95 transition cursor-pointer shrink-0"
           >
             <svg viewBox="0 0 24 24" className="w-5 h-5 fill-[#c86d1f]">
@@ -564,7 +548,6 @@ export default function CozyKnowShanApp() {
             </svg>
           </button>
 
-          {/* 3 Custom Vector Status Pills */}
           <div className="flex items-center gap-2">
             {/* Star Level */}
             <div className="h-7 pr-2.5 pl-0.5 rounded-full bg-[#92aacb]/65 backdrop-blur-md flex items-center gap-1.5">
@@ -590,10 +573,12 @@ export default function CozyKnowShanApp() {
               </div>
             </div>
 
-            {/* Pink Paw Prints */}
+            {/* Published Count */}
             <button
               onClick={() =>
-                store.publishedAnswers.length > 0 ? setDrawer("replies") : openSnowmanLetter()
+                store.publishedAnswers.length > 0
+                  ? setDrawer("replies")
+                  : openRandomSnowmanCreation()
               }
               className="h-7 pr-3 pl-1 rounded-full bg-[#92aacb]/65 backdrop-blur-md flex items-center gap-1.5 cursor-pointer"
             >
@@ -625,39 +610,41 @@ export default function CozyKnowShanApp() {
             </div>
           </div>
 
-          {/* Invisible spacer keeps the 3 status pills symmetrically centered */}
           <div className="w-11 h-11 shrink-0 pointer-events-none" aria-hidden="true" />
         </div>
 
-        {/* ============================================================= */}
-        {/* LEFT VERTICAL WARM VECTOR BUTTONS (Flower / Bell / Notebook)  */}
-        {/* ============================================================= */}
+        {/* LEFT VERTICAL BUTTONS */}
         <div className="absolute left-4 top-[178px] z-20 flex flex-col gap-3.5">
-          {/* Flower Gear */}
+          {/* MBTI Gear */}
           <button
             onClick={() => setDrawer("settings")}
             className="w-11 h-11 rounded-full bg-[#fdfbf7]/94 shadow-[0_3px_10px_rgba(120,150,190,0.18)] flex items-center justify-center active:scale-95 transition cursor-pointer"
+            title="性格波长 MBTI"
           >
             <svg viewBox="0 0 24 24" className="w-5 h-5 fill-[#c86d1f]">
               <path d="M12 2a2.4 2.4 0 0 1 2.2 1.5 2.4 2.4 0 0 1 2.7-.5 2.4 2.4 0 0 1 1.1 2.5 2.4 2.4 0 0 1 2.1 1.6 2.4 2.4 0 0 1-.6 2.7 2.4 2.4 0 0 1 .6 2.7 2.4 2.4 0 0 1-2.1 1.6 2.4 2.4 0 0 1-1.1 2.5 2.4 2.4 0 0 1-2.7-.5A2.4 2.4 0 0 1 12 22a2.4 2.4 0 0 1-2.2-1.5 2.4 2.4 0 0 1-2.7.5 2.4 2.4 0 0 1-1.1-2.5 2.4 2.4 0 0 1-2.1-1.6 2.4 2.4 0 0 1 .6-2.7 2.4 2.4 0 0 1-.6-2.7A2.4 2.4 0 0 1 6 5.1a2.4 2.4 0 0 1 1.1-2.5 2.4 2.4 0 0 1 2.7.5A2.4 2.4 0 0 1 12 2zm0 7a3 3 0 1 0 0 6 3 3 0 0 0 0-6z" />
             </svg>
           </button>
 
-          {/* Soft Bell */}
+          {/* Replies / Community Echoes Bell */}
           <button
-            onClick={() => setDrawer("bubble")}
+            onClick={() => setDrawer("replies")}
             className="relative w-11 h-11 rounded-full bg-[#fdfbf7]/94 shadow-[0_3px_10px_rgba(120,150,190,0.18)] flex items-center justify-center active:scale-95 transition cursor-pointer"
+            title="雪球收到的回音"
           >
             <svg viewBox="0 0 24 24" className="w-5 h-5 fill-[#c86d1f]">
               <path d="M12 3a5 5 0 0 0-5 5v3.2L5.3 13.8a1 1 0 0 0 .8 1.6h11.8a1 1 0 0 0 .8-1.6L17 11.2V8a5 5 0 0 0-5-5zm-2 14a2 2 0 0 0 4 0h-4z" />
             </svg>
-            <span className="absolute top-2 right-2.5 w-2.5 h-2.5 rounded-full bg-[#f97316] border-2 border-[#fdfbf7]" />
+            {store.publishedAnswers.length > 0 && (
+              <span className="absolute top-2 right-2.5 w-2.5 h-2.5 rounded-full bg-[#f97316] border-2 border-[#fdfbf7]" />
+            )}
           </button>
 
-          {/* Spiral Notebook */}
+          {/* Burrow History Quick Entry */}
           <button
-            onClick={() => setDrawer("diary")}
+            onClick={() => setDrawer("burrow")}
             className="w-11 h-11 rounded-full bg-[#fdfbf7]/94 shadow-[0_3px_10px_rgba(120,150,190,0.18)] flex items-center justify-center active:scale-95 transition cursor-pointer"
+            title="树洞聊天记录"
           >
             <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none">
               <rect x="6" y="4" width="13" height="16" rx="3" fill="#c86d1f" />
@@ -668,7 +655,7 @@ export default function CozyKnowShanApp() {
             </svg>
           </button>
 
-          {/* In-Frame 3D / 2D Quick Switch Badge (works on mobile & portrait too!) */}
+          {/* 3D / 2D Switcher */}
           <button
             onClick={() => {
               const next = renderMode === "3d" ? "2d" : "3d";
@@ -676,7 +663,6 @@ export default function CozyKnowShanApp() {
               showToast(next === "2d" ? "已切换为绘本 2D 看山" : "已切换为立体 3D 看山");
             }}
             className="w-11 h-11 rounded-full bg-[#fdfbf7]/94 shadow-[0_3px_10px_rgba(120,150,190,0.18)] flex flex-col items-center justify-center active:scale-95 transition cursor-pointer"
-            title="切换 3D / 2D 画风"
           >
             <span className="text-[13px] font-bold text-[#c86d1f] leading-none">
               {renderMode === "3d" ? "2D" : "3D"}
@@ -687,16 +673,14 @@ export default function CozyKnowShanApp() {
           </button>
         </div>
 
-        {/* ============================================================= */}
-        {/* EXPERIENCE-LINKED TOPIC QUESTION BUBBLE ("提问题的那个提问")   */}
-        {/* ============================================================= */}
+        {/* EXPERIENCE-LINKED TOPIC QUESTION BUBBLE */}
         {toast ? (
           <div className="absolute top-[166px] left-1/2 -translate-x-1/2 z-30 px-4 py-1.5 rounded-full bg-[#52657c]/85 backdrop-blur-md text-white text-[13px] font-medium shadow-sm whitespace-nowrap">
             {toast}
           </div>
         ) : (
           <button
-            onClick={() => setDrawer("bubble")}
+            onClick={() => setDrawer("burrow")}
             className={`absolute top-[200px] left-1/2 -translate-x-1/2 z-10 w-max ${
               isFullWindow ? "max-w-[260px] sm:max-w-[380px]" : "max-w-[248px]"
             } px-3.5 py-2 rounded-[22px] bg-[#fdfbf7]/94 hover:bg-[#fdfbf7] backdrop-blur-md shadow-[0_4px_16px_rgba(116,150,196,0.2)] flex items-start gap-2 text-left transition cursor-pointer`}
@@ -707,13 +691,11 @@ export default function CozyKnowShanApp() {
             <span className="text-[13px] font-bold text-[#6e4720] leading-snug">
               {isHuntingTreasure ? "去雪原上替你翻新宝贝咯…" : activeQuestionBubble}
             </span>
-            <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#fdfbf7]/92 rotate-45" />
+            <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#fdfbf7]/94 rotate-45" />
           </button>
         )}
 
-        {/* ============================================================= */}
-        {/* FULL-BLEED 3D OR 2D STAGE (Autonomous Snowman + Room Items!)  */}
-        {/* ============================================================= */}
+        {/* FULL-BLEED 3D OR 2D STAGE */}
         <div className="absolute inset-0 z-0">
           {renderMode === "3d" ? (
             <KanShanStage3D
@@ -722,12 +704,12 @@ export default function CozyKnowShanApp() {
               isHuntingTreasure={isHuntingTreasure}
               isRecordingNose={isRecordingNose}
               onTapHead={() => {
-                showToast("蹭了蹭你的手心");
+                showToast("蹭了蹭你的手心（长按黑鼻子可录玩偶悄悄话）");
                 postState({ action: "hardware_interact", interactType: "head_pat" });
               }}
               onTapNoseStart={handleNoseStart}
               onTapNoseEnd={handleNoseEnd}
-              onTapSnowman={openSnowmanLetter}
+              onTapSnowman={() => openRandomSnowmanCreation()}
               onSelectHoardItem={handleSelectHoardInRoom}
             />
           ) : (
@@ -737,25 +719,22 @@ export default function CozyKnowShanApp() {
               isHuntingTreasure={isHuntingTreasure}
               isRecordingNose={isRecordingNose}
               onTapHead={() => {
-                showToast("蹭了蹭你的手心");
+                showToast("蹭了蹭你的手心（长按黑鼻子可录玩偶悄悄话）");
                 postState({ action: "hardware_interact", interactType: "head_pat" });
               }}
               onTapNoseStart={handleNoseStart}
               onTapNoseEnd={handleNoseEnd}
-              onTapSnowman={openSnowmanLetter}
+              onTapSnowman={() => openRandomSnowmanCreation()}
               onSelectHoardItem={handleSelectHoardInRoom}
             />
           )}
         </div>
 
-        {/* ============================================================= */}
-        {/* RIGHT TRANSLUCENT PILL (Feed + Whisper Only — Clean & Compact)*/}
-        {/* ============================================================= */}
+        {/* RIGHT TRANSLUCENT PILL (喂食 + 树洞) */}
         <div className="absolute right-4 top-[250px] z-20 w-[62px] py-3.5 rounded-full bg-white/58 backdrop-blur-md border border-white/70 shadow-[0_6px_24px_rgba(125,158,200,0.18)] flex flex-col items-center gap-4">
-          {/* 喂食: Plump Orange Pet Bowl with White Paw */}
           <button
             onClick={handleFeedCodfish}
-            className="flex flex-col items-center gap-1 active:scale-95 transition cursor-pointer"
+            className="relative flex flex-col items-center gap-1 active:scale-95 transition cursor-pointer"
           >
             <svg viewBox="0 0 40 40" className="w-10 h-10">
               <ellipse cx="20" cy="14" rx="11" ry="4.5" fill="#fdba74" />
@@ -766,12 +745,16 @@ export default function CozyKnowShanApp() {
               <circle cx="20" cy="19.5" r="1.1" fill="#fff7ed" />
               <circle cx="23.2" cy="20.5" r="1.1" fill="#fff7ed" />
             </svg>
+            {(store.pet.codfishCount || 0) > 0 && (
+              <span className="absolute -top-0.5 -right-0.5 px-1.5 rounded-full bg-[#38bdf8] text-white text-[10px] font-bold">
+                {store.pet.codfishCount}
+              </span>
+            )}
             <span className="text-[13px] font-bold text-[#784315]">喂食</span>
           </button>
 
-          {/* 树洞: Pink + Blue Twin Blobs */}
           <button
-            onClick={() => setDrawer("whisper")}
+            onClick={() => setDrawer("burrow")}
             className="flex flex-col items-center gap-1 active:scale-95 transition cursor-pointer"
           >
             <svg viewBox="0 0 40 40" className="w-10 h-10">
@@ -787,9 +770,7 @@ export default function CozyKnowShanApp() {
           </button>
         </div>
 
-        {/* ============================================================= */}
-        {/* BOTTOM CURVED SNOW DOME (`出门` Refreshes Room Treasures!)    */}
-        {/* ============================================================= */}
+        {/* BOTTOM SNOW DOME (`出门`) */}
         <div
           onClick={handleGoOutdoors}
           className="absolute -bottom-8 left-[-10%] right-[-10%] h-38 z-20 rounded-t-[100%] bg-gradient-to-b from-white/55 via-white/78 to-white/94 backdrop-blur-md border-t border-white/85 flex flex-col items-center pt-3 cursor-pointer hover:from-white/70 active:scale-[0.99] transition"
@@ -820,26 +801,58 @@ export default function CozyKnowShanApp() {
         </div>
 
         {/* ============================================================= */}
-        {/* COZY BOTTOM SHEETS (Soft Cream & Ice-Milk Surfaces)           */}
+        {/* MODULE A: SNOWBALL RANDOM 3-MODE CREATION MODAL               */}
         {/* ============================================================= */}
-        {drawer && (
+        {drawer === "snowman" && (
+          <SnowballCreationSheet
+            store={store}
+            initialMode={snowballMode}
+            preferredSessionId={preferredSnowSessionId}
+            onClose={() => setDrawer(null)}
+            onStoreChange={setStore}
+            onJumpToBurrow={(sessionId) => {
+              if (sessionId) setStore(apiSelectChatSession(sessionId));
+              setDrawer("burrow");
+            }}
+            onConfirmPublished={handleConfirmSnowballPublished}
+            showToast={showToast}
+          />
+        )}
+
+        {/* ============================================================= */}
+        {/* MODULE B: DUAL-PANE BURROW AI CHAT + DOLL VOICE RECORDS       */}
+        {/* ============================================================= */}
+        {drawer === "burrow" && (
+          <BurrowChatModal
+            store={store}
+            onStoreChange={setStore}
+            onClose={() => setDrawer(null)}
+            onGenerateSnowballFromSession={(sessionId) =>
+              openRandomSnowmanCreation(sessionId)
+            }
+            showToast={showToast}
+          />
+        )}
+
+        {/* ============================================================= */}
+        {/* OTHER COZY BOTTOM SHEETS (Wardrobe / Nose Voice / Treasure / Settings) */}
+        {/* ============================================================= */}
+        {drawer && drawer !== "snowman" && drawer !== "burrow" && (
           <div
             className="absolute inset-0 z-40 bg-[#334e68]/18 backdrop-blur-[2px] flex items-end justify-center"
             onClick={() => setDrawer(null)}
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg rounded-t-[36px] bg-[#f9fbff]/96 backdrop-blur-xl border-t border-white shadow-[0_-12px_40px_rgba(65,98,145,0.18)] p-5 pb-7 max-h-[66%] overflow-y-auto space-y-4"
+              className="w-full max-w-lg rounded-t-[36px] bg-[#f9fbff]/96 backdrop-blur-xl border-t border-white shadow-[0_-12px_40px_rgba(65,98,145,0.18)] p-5 pb-7 max-h-[68%] overflow-y-auto space-y-4"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
                   {/* eslint-disable-next-line @next/next/no-img-element */}
                   <img
                     src={
-                      drawer === "whisper"
+                      drawer === "nose_voice"
                         ? `${BASE_PATH}/kanshan-anim/sleepy.gif`
-                        : drawer === "snowman" || drawer === "bubble"
-                        ? `${BASE_PATH}/kanshan-anim/laptop.gif`
                         : `${BASE_PATH}/kanshan-anim/idle.gif`
                     }
                     alt=""
@@ -847,10 +860,7 @@ export default function CozyKnowShanApp() {
                   />
                   <span className="text-[16px] font-bold text-[#6e4720]">
                     {drawer === "wardrobe" && "小衣柜"}
-                    {drawer === "whisper" && "跟看山念叨两句"}
-                    {drawer === "bubble" && "外面的同频夜话"}
-                    {drawer === "diary" && "悄悄话本子"}
-                    {drawer === "snowman" && "雪球里的信"}
+                    {drawer === "nose_voice" && "3D 玩偶鼻头录音已捕捉"}
                     {drawer === "treasure" && (selectedHoard?.itemName || "屋里发光的小物件")}
                     {drawer === "replies" && "雪球收到的回音"}
                     {drawer === "settings" && "性格波长"}
@@ -900,184 +910,49 @@ export default function CozyKnowShanApp() {
                 </div>
               )}
 
-              {/* WHISPER */}
-              {drawer === "whisper" && (
+              {/* 3D DOLL NOSE VOICE CONFIRMATION */}
+              {drawer === "nose_voice" && (
                 <div className="space-y-3">
-                  <div className="flex items-center justify-between">
-                    <span className="text-[13px] text-[#708399]">
-                      不想发朋友圈的话，留在这里就好
-                    </span>
-                    <button
-                      onMouseDown={handleNoseStart}
-                      onMouseUp={handleNoseEnd}
-                      className={`px-3.5 py-1.5 rounded-full text-[12px] font-bold cursor-pointer transition ${
-                        isRecordingNose
-                          ? "bg-[#5b9bf8] text-white"
-                          : "bg-[#e6f1fe] text-[#4a7ec7]"
-                      }`}
-                    >
-                      {isRecordingNose ? "松开说完" : "按住说话"}
-                    </button>
+                  <div className="text-[12.5px] text-[#647890]">
+                    确认或微调刚才对着看山黑鼻子说的话，保存后会同步到树洞「来自玩偶的声音」：
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {VOICE_PRESETS.map((p, idx) => (
+                  <div className="flex flex-wrap gap-1.5">
+                    {NOSE_VOICE_PRESETS.map((preset, i) => (
                       <button
-                        key={idx}
-                        onClick={() => setWhisperInput(p.full)}
-                        className="text-[12px] px-3 py-1.5 rounded-full bg-white shadow-[0_2px_8px_rgba(148,179,214,0.14)] text-[#6e5a49] hover:bg-[#fef9f2] cursor-pointer"
+                        key={i}
+                        onClick={() => setNoseTranscript(preset)}
+                        className="px-2.5 py-1 rounded-full bg-white border border-[#e2ecf9] text-[11.5px] text-[#6e5a49] hover:bg-[#fff9eb] cursor-pointer"
                       >
-                        {p.short}
+                        示例 {i + 1}
                       </button>
                     ))}
                   </div>
                   <textarea
                     rows={3}
-                    value={whisperInput}
-                    onChange={(e) => setWhisperInput(e.target.value)}
-                    placeholder="今天过得怎么样…"
-                    className="w-full rounded-[22px] bg-white shadow-[inset_0_2px_6px_rgba(148,179,214,0.14)] p-3.5 text-[14px] text-[#4c3b2e] placeholder:text-[#a8b6c7] focus:outline-none resize-none"
+                    value={noseTranscript}
+                    onChange={(e) => setNoseTranscript(e.target.value)}
+                    placeholder="在这里检查或补充语音转写内容…"
+                    className="w-full rounded-[20px] bg-white border border-[#dde9f8] p-3.5 text-[13px] text-[#4c3b2e] focus:outline-none"
                   />
-                  <button
-                    disabled={!whisperInput.trim() || busy}
-                    onClick={submitWhisper}
-                    className="w-full py-3 rounded-full bg-gradient-to-r from-[#69acf8] to-[#5294ef] disabled:opacity-40 text-white text-[14px] font-bold shadow-xs cursor-pointer"
-                  >
-                    团进雪球里
-                  </button>
-                </div>
-              )}
-
-              {/* BUBBLE CHAT */}
-              {drawer === "bubble" && (
-                <div className="space-y-3">
-                  <div className="p-3.5 rounded-[22px] bg-[#edf5ff]">
-                    <div className="text-[12px] font-semibold text-[#5b8fd9]">{activeQ.topic}</div>
-                    <div className="text-[14px] font-bold text-[#4c3b2e] mt-0.5 leading-snug">
-                      {activeQ.title}
-                    </div>
-                  </div>
-                  <div className="space-y-2.5 max-h-44 overflow-y-auto pr-1">
-                    {activeMsgs.map((m) => (
-                      <div
-                        key={m.id}
-                        className={`flex ${m.role === "user" ? "justify-end" : "justify-start"}`}
-                      >
-                        <div
-                          className={`max-w-[84%] px-3.5 py-2.5 rounded-[20px] text-[13px] leading-relaxed ${
-                            m.role === "user"
-                              ? "bg-[#63a4f7] text-white"
-                              : "bg-white shadow-[0_2px_8px_rgba(148,179,214,0.12)] text-[#57493d]"
-                          }`}
-                        >
-                          {m.content}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="flex gap-2">
-                    <input
-                      value={chatInput}
-                      onChange={(e) => setChatInput(e.target.value)}
-                      onKeyDown={(e) => e.key === "Enter" && sendChat()}
-                      placeholder="回看山一句…"
-                      className="flex-1 text-[13px] rounded-full bg-white shadow-[inset_0_2px_6px_rgba(148,179,214,0.14)] px-4 py-2.5 text-[#4c3b2e] placeholder:text-[#a8b6c7] focus:outline-none"
-                    />
+                  <div className="flex items-center justify-end gap-2">
                     <button
-                      disabled={!chatInput.trim() || busy}
-                      onClick={() => sendChat()}
-                      className="px-4 py-2.5 rounded-full bg-[#63a4f7] text-white text-[13px] font-bold cursor-pointer"
+                      onClick={() => setDrawer("burrow")}
+                      className="px-4 py-2 rounded-full bg-white text-[12.5px] font-bold text-[#528be0] cursor-pointer"
                     >
-                      发送
+                      去树洞查看全部
                     </button>
                     <button
-                      onClick={openSnowmanLetter}
-                      className="px-3.5 py-2.5 rounded-full bg-[#fde047] text-[#784315] text-[13px] font-bold whitespace-nowrap cursor-pointer"
+                      disabled={!noseTranscript.trim()}
+                      onClick={handleSaveNoseVoice}
+                      className="px-5 py-2.5 rounded-full bg-[#63a4f7] disabled:opacity-40 text-white text-[13px] font-bold cursor-pointer"
                     >
-                      看雪球信
+                      保存到「来自玩偶的声音」
                     </button>
                   </div>
                 </div>
               )}
 
-              {/* SNOWMAN LETTER */}
-              {drawer === "snowman" && draftInfo && (
-                <div className="space-y-3">
-                  <div className="px-3.5 py-2.5 rounded-[20px] bg-[#edf5ff] flex items-center justify-between gap-2">
-                    <span className="text-[12px] font-semibold text-[#5476a3]">
-                      自动隐去学校和名字（{draftInfo.redactedTerms.join(" · ")}）
-                    </span>
-                    <input
-                      type="checkbox"
-                      checked={hideNames}
-                      onChange={(e) => {
-                        setHideNames(e.target.checked);
-                        setPostText(
-                          e.target.checked ? draftInfo.desensitizedDraft : draftInfo.rawDraft
-                        );
-                      }}
-                      className="accent-[#5b9bf8] w-4 h-4 shrink-0"
-                    />
-                  </div>
-                  <textarea
-                    rows={6}
-                    value={postText}
-                    onChange={(e) => setPostText(e.target.value)}
-                    className="w-full rounded-[22px] bg-white shadow-[inset_0_2px_6px_rgba(148,179,214,0.14)] p-3.5 text-[13px] leading-relaxed text-[#4c3b2e] focus:outline-none"
-                  />
-                  <div className="flex items-center justify-between gap-2">
-                    <div className="flex gap-2">
-                      <button
-                        onClick={() => {
-                          navigator.clipboard.writeText(postText);
-                          setCopied(true);
-                          setTimeout(() => setCopied(false), 1800);
-                        }}
-                        className="px-3.5 py-2 rounded-full bg-white shadow-2xs text-[13px] font-semibold text-[#6e5a49] cursor-pointer"
-                      >
-                        {copied ? "已复制" : "复制文字"}
-                      </button>
-                      <a
-                        href={draftInfo.question.zhihuSearchUrl}
-                        target="_blank"
-                        rel="noreferrer"
-                        className="px-3.5 py-2 rounded-full bg-white shadow-2xs text-[13px] font-semibold text-[#528be0]"
-                      >
-                        去原问题看
-                      </a>
-                    </div>
-                    <button
-                      disabled={busy}
-                      onClick={publishSnowman}
-                      className="px-5 py-2.5 rounded-full bg-gradient-to-r from-[#fbbf24] to-[#f59e0b] text-[#784315] text-[13px] font-bold shadow-2xs cursor-pointer"
-                    >
-                      寄出去
-                    </button>
-                  </div>
-                </div>
-              )}
-
-              {/* DIARY */}
-              {drawer === "diary" && (
-                <div className="space-y-2.5">
-                  {store.whispers.map((w) => (
-                    <div
-                      key={w.id}
-                      className="p-4 rounded-[22px] bg-white shadow-[0_2px_10px_rgba(148,179,214,0.12)] space-y-1.5"
-                    >
-                      <div className="flex items-center justify-between text-[12px] text-[#94a3b8]">
-                        <span className="px-2.5 py-0.5 rounded-full bg-[#edf5ff] text-[#528be0] font-semibold">
-                          {w.emotionTag}
-                        </span>
-                        <span>{w.createdAt}</span>
-                      </div>
-                      <p className="text-[13px] text-[#4c3b2e] leading-relaxed">{w.rawText}</p>
-                      <p className="text-[12px] text-[#8496ab]">{w.structuredSummary}</p>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              {/* DIRECT ROOM TREASURE CARD (Clicked directly from glowing 3D/2D room item!) */}
+              {/* DIRECT ROOM TREASURE CARD */}
               {drawer === "treasure" && selectedHoard && (
                 <div className="space-y-3">
                   <div className="p-3.5 rounded-[22px] bg-gradient-to-r from-[#fff9db] via-[#fef5c8] to-[#edf6ff] border border-[#fde68a]/80 flex items-center gap-3">
@@ -1126,7 +1001,6 @@ export default function CozyKnowShanApp() {
                     </div>
                   </div>
 
-                  {/* Quick pills for the other two glowing treasures currently in the room */}
                   <div className="flex items-center gap-2 pt-0.5">
                     {store.hoardedItems.map((h) => (
                       <button
@@ -1156,9 +1030,12 @@ export default function CozyKnowShanApp() {
                       >
                         <div className="flex items-center justify-between">
                           <span className="text-[13px] font-bold text-[#9a5b25]">
-                            寄出的雪球收到了 {ans.upvotes} 份赞同
+                            分享的内容收到了 {ans.upvotes} 份赞同 · 小银鳕鱼 +1
                           </span>
                           <span className="text-[11px] text-[#a38b73]">{ans.createdAt}</span>
+                        </div>
+                        <div className="text-[12.5px] font-bold text-[#4c3b2e]">
+                          {ans.questionTitle}
                         </div>
                         <p className="text-[12px] text-[#6e5a49] line-clamp-2">{ans.content}</p>
                         <div className="space-y-2 pt-1">
@@ -1176,7 +1053,7 @@ export default function CozyKnowShanApp() {
                     ))
                   ) : (
                     <div className="p-4 rounded-[22px] bg-white text-[13px] text-[#6e7f94]">
-                      还没有寄出过雪球信，点看山身边的雪球就能写一封啦。
+                      还没有确认发布过雪球内容，点看山身旁的雪球就能随机触发创作草稿啦。
                     </div>
                   )}
                 </div>
@@ -1189,7 +1066,6 @@ export default function CozyKnowShanApp() {
                   allMbti.find((m) => m.code === store.persona.mbti) || allMbti[0];
                 return (
                   <div className="space-y-3">
-                    {/* Dropdown Menu Trigger Bar */}
                     <div className="rounded-[22px] bg-white shadow-[0_2px_12px_rgba(148,179,214,0.14)] border border-[#e3eefb] overflow-hidden">
                       <button
                         onClick={() => setMbtiMenuOpen(!mbtiMenuOpen)}
@@ -1224,7 +1100,6 @@ export default function CozyKnowShanApp() {
                         </div>
                       </button>
 
-                      {/* Grouped 16-Type Scrollable Menu */}
                       {mbtiMenuOpen && (
                         <div className="border-t border-[#edf3fc] max-h-52 overflow-y-auto px-2.5 py-2 space-y-2.5 bg-[#fbfdff]">
                           {MBTI_MENU_GROUPS.map((grp) => (
@@ -1289,7 +1164,6 @@ export default function CozyKnowShanApp() {
                       )}
                     </div>
 
-                    {/* Mirrored Companion Trait Card */}
                     <div className="p-3.5 rounded-[20px] bg-[#edf5ff]/85">
                       <div className="text-[13px] font-bold text-[#4c3b2e]">
                         {store.persona.mirrorTrait}

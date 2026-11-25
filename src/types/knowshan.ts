@@ -7,6 +7,9 @@ export type PetMood =
   | "night_owl"
   | "sleeping";
 
+export type SnowballCreationMode = "ask" | "answer" | "post";
+export type PostSubFormat = "article" | "pin";
+
 export interface PersonaProfile {
   nickname: string;
   mbti: string;
@@ -38,6 +41,7 @@ export interface PetState {
   hasDarkCircles: boolean;
   exp: number;
   level: number;
+  codfishCount?: number;
   snowballProgress: number;
   unlockedItems: string[];
   equippedItems: string[];
@@ -75,9 +79,70 @@ export interface ZhihuQuestion {
 
 export interface ChatMessage {
   id: string;
+  sessionId?: string;
   role: "kanshan" | "user";
   content: string;
+  inputType?: "text" | "voice";
+  source?: "web" | "doll";
+  audioUrl?: string;
+  durationSec?: number;
   createdAt: string;
+}
+
+export interface ChatSession {
+  id: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+  source: "web" | "doll" | "mixed";
+  allowForCreation: boolean;
+  linkedVoiceId?: string;
+  messages: ChatMessage[];
+}
+
+export interface DollVoiceRecord {
+  id: string;
+  transcript: string;
+  durationSec: number;
+  audioUrl?: string;
+  sourceLabel: string;
+  createdAt: string;
+  linkedSessionId?: string;
+  allowForCreation: boolean;
+}
+
+export interface SnowballDraftBundle {
+  sourceLabel: string;
+  sourceSessionId?: string;
+  redactedTerms: string[];
+  // Mode 1: Ask a Zhihu Question
+  askTitle: string;
+  askDetail: string;
+  askTopics: string[];
+  // Mode 2: Answer an Existing Real Zhihu Question
+  matchedQuestion: ZhihuQuestion;
+  alternateQuestions: ZhihuQuestion[];
+  answerDraft: string;
+  answerDraftRaw: string;
+  // Mode 3: Publish Standalone Post or Daily Pin ("想法")
+  postTitle: string;
+  articleBody: string;
+  articleBodyRaw: string;
+  pinBody: string;
+  pinBodyRaw: string;
+}
+
+export interface SavedSnowballDraft {
+  id: string;
+  mode: SnowballCreationMode;
+  postFormat: PostSubFormat;
+  title: string;
+  content: string;
+  questionId?: string;
+  desensitized: boolean;
+  anonymousRequested: boolean;
+  sourceSessionId?: string;
+  updatedAt: string;
 }
 
 export interface HoardedItem {
@@ -95,10 +160,12 @@ export interface HoardedItem {
 
 export interface PublishedAnswer {
   id: string;
+  creationType?: SnowballCreationMode;
   questionId: string;
   questionTitle: string;
   content: string;
   desensitized: boolean;
+  anonymousNote?: string;
   redactedTerms: string[];
   createdAt: string;
   upvotes: number;
@@ -112,6 +179,12 @@ export interface KnowShanStore {
   questions: ZhihuQuestion[];
   activeQuestionId: string;
   dialogues: Record<string, ChatMessage[]>;
+  // Module B: Multi-session Burrow AI Chat + Doll Voice Records
+  chatSessions: ChatSession[];
+  activeSessionId: string;
+  dollVoiceRecords: DollVoiceRecord[];
+  // Module A: Saved Snowball Drafts
+  savedDrafts: SavedSnowballDraft[];
   hoardedItems: HoardedItem[];
   publishedAnswers: PublishedAnswer[];
 }

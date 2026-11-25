@@ -227,11 +227,11 @@ export default function KanShanStage2D({
         }
         @keyframes ks-treasure-bob {
           0%, 100% { transform: translateY(0px); }
-          50% { transform: translateY(-3px); }
+          50% { transform: translateY(-6px); }
         }
         @keyframes ks-twinkle {
-          0%, 100% { opacity: 0.3; transform: scale(0.7); }
-          50% { opacity: 0.95; transform: scale(1.15); }
+          0%, 100% { opacity: 0.55; transform: scale(0.85); }
+          50% { opacity: 0.92; transform: scale(1.08); }
         }
       `}</style>
 
@@ -289,28 +289,28 @@ export default function KanShanStage2D({
         </g>
       </svg>
 
-      {/* SUBTLE LOW-KEY ROOM TREASURES */}
+      {/* SOFT GLOWING & GENTLY FLOATING ROOM TREASURES */}
       {hoardedItems.slice(0, 3).map((item, idx) => (
         <button
           key={item.id}
           onClick={() => onSelectHoardItem(item)}
-          className={`group absolute ${spotClasses[idx]} z-20 flex flex-col items-center cursor-pointer opacity-90 hover:opacity-100 transition`}
+          className={`group absolute ${spotClasses[idx]} z-20 flex flex-col items-center cursor-pointer transition`}
           style={{
-            animation: `ks-treasure-bob ${3.2 + idx * 0.4}s ease-in-out infinite`,
+            animation: `ks-treasure-bob ${3.0 + idx * 0.4}s ease-in-out infinite`,
           }}
         >
-          <div className="relative flex items-center justify-center scale-90">
-            <span className="absolute w-9 h-9 rounded-full bg-amber-200/35 blur-sm group-hover:bg-amber-200/60 transition" />
+          <div className="relative flex items-center justify-center">
+            <span className="absolute w-12 h-12 rounded-full bg-amber-200/55 blur-md group-hover:bg-amber-300/75 transition" />
             <svg
               viewBox="0 0 20 20"
-              className="absolute -top-1 -right-1 w-2.5 h-2.5 fill-[#fef08a]"
-              style={{ animation: "ks-twinkle 2.2s ease-in-out infinite" }}
+              className="absolute -top-1.5 -right-1.5 w-3.5 h-3.5 fill-[#fef08a]"
+              style={{ animation: "ks-twinkle 2.6s ease-in-out infinite" }}
             >
               <path d="M10 0 L12.2 7.8 L20 10 L12.2 12.2 L10 20 L7.8 12.2 L0 10 L7.8 7.8 Z" />
             </svg>
             <Treasure2DGlyph kind={item.emoji} />
           </div>
-          <span className="px-1.5 py-0.5 rounded-full bg-[#fdfbf7]/80 text-[10px] font-semibold text-[#784315]/85 whitespace-nowrap">
+          <span className="mt-0.5 px-2 py-0.5 rounded-full bg-[#fdfbf7]/90 shadow-2xs text-[10.5px] font-bold text-[#784315] whitespace-nowrap">
             {item.itemName}
           </span>
         </button>

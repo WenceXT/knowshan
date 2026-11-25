@@ -20,6 +20,11 @@ export async function POST(req: Request) {
     return NextResponse.json({ store: fresh, accessories: ACCESSORIES });
   }
 
+  if (body.action === "sync_store" && body.store) {
+    writeStore(body.store);
+    return NextResponse.json({ store: body.store, accessories: ACCESSORIES });
+  }
+
   if (body.action === "hardware_interact") {
     const type = body.interactType as "head_pat" | "cheek_pinch" | "sleep_toggle" | "late_night_toggle" | "morning_greet";
     if (type === "head_pat") {

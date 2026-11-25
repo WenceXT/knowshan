@@ -735,12 +735,15 @@ function createStarSparkleGeometry(radius = 0.026): THREE.ShapeGeometry {
 }
 
 /**
- * Delicate, Grounded Miniature 3D Room Treasure Pod (bottom strictly at y >= 0, subtle low-key shimmer)
+ * Softly Glowing, Gently Floating 3D Room Treasure Pod
+ * - Retains warm floor halo + elevated soft aura (strictly above y = 0 so it NEVER clips into cushions/rugs!)
+ * - Calm, non-strobing starlight + gentle vertical floating breath
  */
 export function buildSparklingRoomTreasure(kind: string, slotIndex: number): {
   root: THREE.Group;
   propGroup: THREE.Group;
   haloMesh: THREE.Mesh;
+  auraMesh: THREE.Mesh;
   stars: THREE.Mesh[];
   hitMesh: THREE.Mesh;
 } {
@@ -748,126 +751,139 @@ export function buildSparklingRoomTreasure(kind: string, slotIndex: number): {
   const propGroup = new THREE.Group();
   root.add(propGroup);
 
+  // 1. Warm Soft Floor Halo (on surface y = 0.008) + Elevated Soft Back Aura (bottom at y = 0.04 -> zero surface clipping!)
   const haloMat = new THREE.MeshBasicMaterial({
     map: getTreasureGlowTexture(),
     transparent: true,
-    opacity: 0.36,
+    opacity: 0.58,
     depthWrite: false,
   });
-  const haloMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.30, 0.30), haloMat);
+  const haloMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.48, 0.48), haloMat);
   haloMesh.rotation.x = -Math.PI / 2;
-  haloMesh.position.y = 0.005;
+  haloMesh.position.y = 0.008;
   root.add(haloMesh);
 
+  const auraMesh = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.38, 0.38),
+    new THREE.MeshBasicMaterial({
+      map: getTreasureGlowTexture(),
+      transparent: true,
+      opacity: 0.42,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })
+  );
+  // Center at y = 0.22 with half-height 0.19 -> bottom edge is at y = +0.03 (strictly above rug & sofa!)
+  auraMesh.position.set(0, 0.22, -0.02);
+  root.add(auraMesh);
+
+  // 2. Tactile 3D Treasure Prop floating cleanly in mid-air above its halo
   const goldMat = new THREE.MeshStandardMaterial({
     color: 0xfde047,
     emissive: 0xf59e0b,
-    emissiveIntensity: 0.14,
-    roughness: 0.44,
+    emissiveIntensity: 0.22,
+    roughness: 0.38,
   });
   const creamMat = new THREE.MeshStandardMaterial({
     color: 0xfffbeb,
     emissive: 0xfef3c7,
-    emissiveIntensity: 0.10,
-    roughness: 0.55,
+    emissiveIntensity: 0.16,
+    roughness: 0.48,
   });
   const coralMat = new THREE.MeshStandardMaterial({
     color: 0xfb7185,
     emissive: 0xf43f5e,
-    emissiveIntensity: 0.08,
-    roughness: 0.48,
+    emissiveIntensity: 0.14,
+    roughness: 0.44,
   });
   const skyGlowMat = new THREE.MeshStandardMaterial({
     color: 0x7dd3fc,
     emissive: 0x38bdf8,
-    emissiveIntensity: 0.14,
-    roughness: 0.34,
+    emissiveIntensity: 0.22,
+    roughness: 0.3,
   });
 
   const mini = new THREE.Group();
-  const P = 0.54;
+  const P = 0.76;
 
   if (kind === "fish") {
     const fish = buildCuteCodfish();
-    fish.scale.setScalar(0.85 * P);
-    fish.rotation.x = 0.5;
-    fish.rotation.y = -0.35;
-    fish.position.y = 0.065 * P;
+    fish.scale.setScalar(0.95 * P);
+    fish.rotation.y = -0.28;
+    fish.rotation.z = 0.15;
     mini.add(fish);
   } else if (kind === "card" || kind === "plane") {
-    const card = new THREE.Mesh(new THREE.BoxGeometry(0.25 * P, 0.025 * P, 0.18 * P), creamMat);
-    card.position.y = 0.014 * P;
-    card.rotation.y = 0.28;
+    const card = new THREE.Mesh(new THREE.BoxGeometry(0.25 * P, 0.18 * P, 0.025 * P), creamMat);
+    card.rotation.z = 0.12;
+    card.rotation.x = -0.22;
     const seal = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.035 * P, 0.035 * P, 0.018 * P, 16),
+      new THREE.CylinderGeometry(0.035 * P, 0.035 * P, 0.028 * P, 16),
       coralMat
     );
-    seal.position.set(0, 0.028 * P, 0);
+    seal.rotation.x = Math.PI / 2 - 0.22;
+    seal.position.set(0, 0, 0.01 * P);
     mini.add(card, seal);
   } else if (kind === "cocoa") {
     const mug = new THREE.Mesh(
       new THREE.CylinderGeometry(0.10 * P, 0.088 * P, 0.18 * P, 20),
       coralMat
     );
-    mug.position.y = 0.09 * P;
     const foam = new THREE.Mesh(new THREE.SphereGeometry(0.09 * P, 16, 12), creamMat);
     foam.scale.set(1, 0.38, 1);
-    foam.position.y = 0.175 * P;
+    foam.position.y = 0.085 * P;
     mini.add(mug, foam);
   } else if (kind === "shell" || kind === "acorn") {
-    const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.11 * P, 20, 16), goldMat);
-    pearl.scale.set(1.12, 0.82, 0.92);
-    pearl.position.y = 0.092 * P;
+    const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.115 * P, 20, 16), goldMat);
+    pearl.scale.set(1.12, 0.84, 0.92);
     const cap = new THREE.Mesh(
-      new THREE.SphereGeometry(0.115 * P, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.48),
+      new THREE.SphereGeometry(0.12 * P, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.48),
       coralMat
     );
-    cap.position.y = 0.105 * P;
+    cap.position.y = 0.018 * P;
     mini.add(pearl, cap);
   } else {
     const jarGlass = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.098 * P, 0.112 * P, 0.19 * P, 20),
+      new THREE.CylinderGeometry(0.10 * P, 0.114 * P, 0.20 * P, 20),
       new THREE.MeshStandardMaterial({
         color: 0xe0f2fe,
         transparent: true,
-        opacity: 0.65,
-        roughness: 0.18,
+        opacity: 0.62,
+        roughness: 0.15,
       })
     );
-    jarGlass.position.y = 0.096 * P;
-    const innerStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.06 * P, 0), goldMat);
-    innerStar.position.y = 0.096 * P;
+    const innerStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.064 * P, 0), goldMat);
     const cork = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.075 * P, 0.08 * P, 0.038 * P, 16),
+      new THREE.CylinderGeometry(0.078 * P, 0.082 * P, 0.04 * P, 16),
       coralMat
     );
-    cork.position.y = 0.20 * P;
-    const glowCore = new THREE.Mesh(new THREE.SphereGeometry(0.04 * P, 14, 14), skyGlowMat);
-    glowCore.position.y = 0.08 * P;
+    cork.position.y = 0.11 * P;
+    const glowCore = new THREE.Mesh(new THREE.SphereGeometry(0.044 * P, 14, 14), skyGlowMat);
+    glowCore.position.y = -0.015 * P;
     mini.add(jarGlass, innerStar, cork, glowCore);
   }
 
   propGroup.add(mini);
-  propGroup.position.y = 0.01;
+  propGroup.position.y = 0.17;
 
-  const starGeo = createStarSparkleGeometry(0.024);
+  // 3. Calm, Soft Starlight Accents (slow breathing, never harsh flashing!)
+  const starGeo = createStarSparkleGeometry(0.034);
   const starMatGold = new THREE.MeshBasicMaterial({
     color: 0xfef08a,
     transparent: true,
-    opacity: 0.82,
+    opacity: 0.78,
     side: THREE.DoubleSide,
   });
   const starMatWhite = new THREE.MeshBasicMaterial({
     color: 0xffffff,
     transparent: true,
-    opacity: 0.82,
+    opacity: 0.75,
     side: THREE.DoubleSide,
   });
 
   const stars: THREE.Mesh[] = [];
   [
-    { x: -0.085, y: 0.175, z: 0.04 },
-    { x: 0.095, y: 0.14, z: 0.05 },
+    { x: -0.13, y: 0.28, z: 0.06 },
+    { x: 0.14, y: 0.21, z: 0.07 },
   ].forEach((so, idx) => {
     const st = new THREE.Mesh(starGeo, idx % 2 === 0 ? starMatGold : starMatWhite);
     st.position.set(so.x, so.y, so.z);
@@ -876,12 +892,12 @@ export function buildSparklingRoomTreasure(kind: string, slotIndex: number): {
   });
 
   const hitMesh = new THREE.Mesh(
-    new THREE.SphereGeometry(0.24, 12, 12),
+    new THREE.SphereGeometry(0.28, 12, 12),
     new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
   );
-  hitMesh.position.y = 0.10;
+  hitMesh.position.y = 0.17;
   hitMesh.name = `hoard_${slotIndex}`;
   root.add(hitMesh);
 
-  return { root, propGroup, haloMesh, stars, hitMesh };
+  return { root, propGroup, haloMesh, auraMesh, stars, hitMesh };
 }
