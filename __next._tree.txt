@@ -1,0 +1,4 @@
+:HL["/knowshan/_next/static/chunks/2imm1rpjmtv68.css","style"]
+:HL["https://fonts.googleapis.com/css2?family=Fredoka:wght@500;600;700&family=Zen+Maru+Gothic:wght@500;700&display=swap","style"]
+1:[["children",{"s":"__PAGE__","h":160}]]
+0:{"b":"cqEPByoXSdpD0wwqi1Y4r","t":{"t":{"s":"","h":80,"c":"$Q1"}}}
