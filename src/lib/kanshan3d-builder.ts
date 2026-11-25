@@ -35,90 +35,77 @@ function sdTaperedCapsule(
   const dy = apy - aby * t;
   const dz = apz - abz * t;
   const r = rA + (rB - rA) * t;
-  return Math.sqrt(dx * dx + dy * dy + dz * dz) - r;
-}
-
-function sdSphere(
-  px: number,
-  py: number,
-  pz: number,
-  cx: number,
-  cy: number,
-  cz: number,
-  r: number
-): number {
-  const dx = px - cx;
-  const dy = py - cy;
-  const dz = pz - cz;
-  return Math.sqrt(dx * dx + dy * dy + dz * dz) - r;
+  return Math.hypot(dx, dy, dz) - r;
 }
 
 /**
- * Cute Q-Version Cartoon Blind-Box Liu Kanshan SDF:
- * - Chubby rounded mochi-pear body (no skinny neck, soft wide cheeks)
- * - Short, plump, adorable fox muzzle (no long anteater tube!)
- * - Plump, soft-tipped rounded fox ears
- * - Fluffy round tail nestled snugly on lower back
+ * Designer-Toy (JOYBRAIN × Zhihu Blind-Box / Cozy Sitting Plushie) Liu Kanshan SDF:
+ * - 1:1 Chubby Marshmallow Cylinder-Mochi Body (wide cute cheeks & forehead, NEVER pointy egg!)
+ * - Flat-cushioned sitting base resting squarely on the fluffy rug
+ * - Wide-set, plump, soft-edged Arctic Fox ears framing a broad innocent forehead
+ * - Subtle smooth snout mound blended seamlessly into the face
  */
 export function evalCartoonKanshanSDF(x: number, y: number, z: number): number {
-  // 1. Plump rounded mochi-pear torso & head
-  const dTorsoRaw = sdTaperedCapsule(
-    x * 0.88,
+  // 1. Wide, huggable 1:1 marshmallow cylinder-pear body (rBottom=0.425, rTop=0.382 -> broad cute head!)
+  const dBodyRaw = sdTaperedCapsule(
+    x * 0.86,
     y,
     z * 0.94,
     0,
-    -0.21,
+    -0.16,
     0.0,
     0,
-    0.15,
-    -0.01,
-    0.405,
-    0.342
+    0.16,
+    0.0,
+    0.425,
+    0.382
   );
-  // Softly cushion the underside of the tummy
-  const dTorso = smax(dTorsoRaw, -(y + 0.565), 0.11);
+  // Softly flatten sitting bottom at y = -0.48 so it sits plumply right on the rug!
+  const dSittingBody = smax(dBodyRaw, -(y + 0.485), 0.115);
 
-  // 2. Plump, thick, rounded cartoon fox ears (wider base, rounder tip, slight outward tilt)
+  // Also gently flatten the top forehead dome slightly so the brow between the ears is wide & cute!
+  const dSoftCrown = smax(dSittingBody, y - 0.485, 0.085);
+
+  // 2. Wide-set, plump, soft-tipped Arctic Fox ears (positioned wider apart at x = ±0.235!)
   const ax = Math.abs(x);
   const dEar = sdTaperedCapsule(
     ax,
     y,
-    (z + 0.02) * 1.15,
-    0.165,
-    0.26,
+    (z + 0.01) * 1.18,
+    0.225,
+    0.31,
     0,
-    0.205,
-    0.545,
+    0.242,
+    0.615,
     0,
-    0.152,
-    0.066
+    0.155,
+    0.068
   );
-  const dHeadEars = smin(dTorso, dEar, 0.068);
+  const dHeadEars = smin(dSoftCrown, dEar, 0.062);
 
-  // 3. Cute SHORT plump muzzle (protrudes gently like a plush toy, never a long pipe!)
+  // 3. Short, plump, stream-lined fox muzzle mound (blends seamlessly into face)
   const dMuzzle = sdTaperedCapsule(
-    x * 0.80,
-    (y - 0.21) * 1.08 + 0.21,
+    x * 0.88,
+    y,
     z,
     0,
-    0.195,
-    0.08,
+    0.18,
+    0.12,
     0,
-    0.215,
-    0.395,
-    0.215,
-    0.135
+    0.195,
+    0.365,
+    0.195,
+    0.148
   );
 
-  return smin(dHeadEars, dMuzzle, 0.115);
+  return smin(dHeadEars, dMuzzle, 0.105);
 }
 
-// Find exact radial surface point at height y and angle theta (0 = +Z front, PI/2 = +X right)
 export function findBodyRadiusAtAngle(y: number, theta: number): number {
   const sinT = Math.sin(theta);
   const cosT = Math.cos(theta);
   let lo = 0.0;
-  let hi = 0.85;
+  let hi = 0.88;
   for (let i = 0; i < 18; i++) {
     const mid = (lo + hi) * 0.5;
     if (evalCartoonKanshanSDF(mid * sinT, y, mid * cosT) < 0) {
@@ -132,7 +119,7 @@ export function findBodyRadiusAtAngle(y: number, theta: number): number {
 
 export function findSurfaceX(y: number, z: number): number {
   let lo = 0.0;
-  let hi = 0.85;
+  let hi = 0.88;
   for (let i = 0; i < 18; i++) {
     const mid = (lo + hi) * 0.5;
     if (evalCartoonKanshanSDF(mid, y, z) < 0) {
@@ -144,10 +131,9 @@ export function findSurfaceX(y: number, z: number): number {
   return (lo + hi) * 0.5;
 }
 
-// Find exact front surface Z at a given (x, y) on the face so glasses wrap organically with zero floating corners!
 export function findFaceSurfaceZ(x: number, y: number): number {
   let lo = 0.0;
-  let hi = 0.75;
+  let hi = 0.78;
   for (let i = 0; i < 18; i++) {
     const mid = (lo + hi) * 0.5;
     if (evalCartoonKanshanSDF(x, y, mid) < 0) {
@@ -164,7 +150,7 @@ export function buildSmoothSDFMesh(
   material: THREE.Material,
   sdfFn: (x: number, y: number, z: number) => number
 ): THREE.Mesh {
-  const mc = new MarchingCubes(resolution, material, false, false, 180000);
+  const mc = new MarchingCubes(resolution, material, false, false, 190000);
   mc.isolation = 0.0;
   mc.reset();
 
@@ -188,7 +174,6 @@ export function buildSmoothSDFMesh(
 
   mc.update();
 
-  // Bake exact analytical SDF gradient normals at every vertex for 100% silky blind-box shading!
   const vCount = mc.count;
   const posOut = new Float32Array(vCount * 3);
   const normOut = new Float32Array(vCount * 3);
@@ -223,7 +208,7 @@ export function buildSmoothSDFMesh(
 }
 
 /**
- * Procedural Knitted Wool Texture (Color + Bump) so scarf & beanie look like cozy yarn!
+ * Procedural Knitted Wool Texture
  */
 export function createKnittedTextures(
   primaryHex: string,
@@ -245,11 +230,10 @@ export function createKnittedTextures(
   bctx.fillStyle = "#808080";
   bctx.fillRect(0, 0, 256, 256);
 
-  // Woven V-stitch knit ribs
   for (let x = 0; x < 256; x += 16) {
-    cctx.fillStyle = "rgba(255,255,255,0.08)";
+    cctx.fillStyle = "rgba(255,255,255,0.09)";
     cctx.fillRect(x, 0, 7, 256);
-    cctx.fillStyle = "rgba(0,0,0,0.07)";
+    cctx.fillStyle = "rgba(0,0,0,0.06)";
     cctx.fillRect(x + 8, 0, 4, 256);
 
     for (let y = 0; y < 256; y += 12) {
@@ -260,20 +244,12 @@ export function createKnittedTextures(
       bctx.lineTo(x + 8, y + 2);
       bctx.lineTo(x + 14, y + 8);
       bctx.stroke();
-
-      bctx.strokeStyle = "#404040";
-      bctx.lineWidth = 1.5;
-      bctx.beginPath();
-      bctx.moveTo(x + 8, y + 2);
-      bctx.lineTo(x + 8, y + 11);
-      bctx.stroke();
     }
   }
 
-  // Subtle decorative winter stripe near border
   cctx.fillStyle = stripeHex;
-  cctx.fillRect(0, 212, 256, 14);
-  cctx.fillRect(0, 234, 256, 6);
+  cctx.fillRect(0, 210, 256, 14);
+  cctx.fillRect(0, 232, 256, 6);
 
   const map = new THREE.CanvasTexture(colorCanvas);
   map.wrapS = THREE.RepeatWrapping;
@@ -290,28 +266,27 @@ export function createKnittedTextures(
 }
 
 /**
- * Builds a Designer-Toy Contoured Double-Coil Knitted Scarf that HUGS the body with zero air gap!
+ * Flush Contoured Double-Coil Knitted Scarf
  */
 export function buildContouredKnittedScarf(S: number): THREE.Group {
   const group = new THREE.Group();
-  const { map, bumpMap } = createKnittedTextures("#3b82f6", "#dbeafe");
+  const { map, bumpMap } = createKnittedTextures("#4a8df8", "#e0f2fe");
 
   const woolMat = new THREE.MeshStandardMaterial({
     map,
     bumpMap,
-    bumpScale: 0.018,
+    bumpScale: 0.016,
     roughness: 0.88,
     metalness: 0.0,
   });
   const fringeMat = new THREE.MeshStandardMaterial({
-    color: 0xdbeafe,
+    color: 0xe0f2fe,
     roughness: 0.92,
   });
 
-  // 1. Upper & Lower Snug Neck Coils contoured directly onto `findBodyRadiusAtAngle`!
   const makeCoilCurve = (baseY: number, radiusOffset: number, frontDip: number, twistWave: number) => {
     const pts: THREE.Vector3[] = [];
-    const steps = 40;
+    const steps = 44;
     for (let i = 0; i < steps; i++) {
       const theta = (i / steps) * Math.PI * 2;
       const dip = Math.max(0, Math.cos(theta)) * frontDip;
@@ -323,34 +298,30 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
     return new THREE.CatmullRomCurve3(pts, true, "catmullrom", 0.5);
   };
 
-  // Lower cozy wrap coil (embedded -0.014 into plush skin so ZERO air gap at any angle!)
   const lowerCoil = new THREE.Mesh(
-    new THREE.TubeGeometry(makeCoilCurve(-0.03, -0.014, 0.04, 0.006), 72, 0.068, 18, true),
+    new THREE.TubeGeometry(makeCoilCurve(-0.02, -0.015, 0.035, 0.005), 72, 0.062, 18, true),
     woolMat
   );
   lowerCoil.castShadow = true;
   group.add(lowerCoil);
 
-  // Upper overlapping cozy wrap coil
   const upperCoil = new THREE.Mesh(
-    new THREE.TubeGeometry(makeCoilCurve(0.025, -0.010, 0.032, -0.005), 72, 0.064, 18, true),
+    new THREE.TubeGeometry(makeCoilCurve(0.032, -0.012, 0.028, -0.004), 72, 0.058, 18, true),
     woolMat
   );
   upperCoil.castShadow = true;
   group.add(upperCoil);
 
-  // 2. Plump Cozy Knot Puff at Front-Right Collar!
-  const knotAngle = 0.38;
-  const knotY = -0.055;
-  const knotR = (findBodyRadiusAtAngle(knotY, knotAngle) + 0.018) * S;
-  const knotMesh = new THREE.Mesh(new THREE.SphereGeometry(0.098, 20, 20), woolMat);
+  const knotAngle = 0.36;
+  const knotY = -0.045;
+  const knotR = (findBodyRadiusAtAngle(knotY, knotAngle) + 0.016) * S;
+  const knotMesh = new THREE.Mesh(new THREE.SphereGeometry(0.092, 20, 20), woolMat);
   knotMesh.scale.set(1.18, 0.92, 0.88);
   knotMesh.position.set(Math.sin(knotAngle) * knotR, knotY * S, Math.cos(knotAngle) * knotR);
   knotMesh.rotation.y = knotAngle;
   knotMesh.castShadow = true;
   group.add(knotMesh);
 
-  // 3. Soft Contoured Draped Scarf Tail + Cute Yarn Fringe Tassels!
   const buildDrapedTail = (
     startAngle: number,
     endAngle: number,
@@ -366,27 +337,25 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
       const t = i / segs;
       const ang = startAngle + (endAngle - startAngle) * t;
       const y = startY + (endY - startY) * t;
-      const r = (findBodyRadiusAtAngle(y, ang) + protrude + Math.sin(t * Math.PI) * 0.015) * S;
+      const r = (findBodyRadiusAtAngle(y, ang) + protrude + Math.sin(t * Math.PI) * 0.012) * S;
       curvePts.push(new THREE.Vector3(Math.sin(ang) * r, y * S, Math.cos(ang) * r));
     }
     const tailCurve = new THREE.CatmullRomCurve3(curvePts);
 
-    // Build a soft rounded-plank ribbon along the curve by placing overlapping smooth capsules/segments
-    // or extruded rounded rectangle shape! ExtrudeGeometry along CatmullRomCurve3 gives a true woven flat scarf tail!
-    const w = 0.082 * widthScale;
-    const th = 0.024;
+    const w = 0.076 * widthScale;
+    const th = 0.022;
     const rectShape = new THREE.Shape();
     rectShape.moveTo(-w, -th);
-    rectShape.quadraticCurveTo(0, -th * 1.3, w, -th);
-    rectShape.quadraticCurveTo(w * 1.15, 0, w, th);
-    rectShape.quadraticCurveTo(0, th * 1.3, -w, th);
-    rectShape.quadraticCurveTo(-w * 1.15, 0, -w, -th);
+    rectShape.quadraticCurveTo(0, -th * 1.25, w, -th);
+    rectShape.quadraticCurveTo(w * 1.12, 0, w, th);
+    rectShape.quadraticCurveTo(0, th * 1.25, -w, th);
+    rectShape.quadraticCurveTo(-w * 1.12, 0, -w, -th);
 
     const extrudeGeo = new THREE.ExtrudeGeometry(rectShape, {
-      steps: 28,
+      steps: 24,
       bevelEnabled: true,
-      bevelThickness: 0.012,
-      bevelSize: 0.01,
+      bevelThickness: 0.01,
+      bevelSize: 0.008,
       bevelSegments: 4,
       extrudePath: tailCurve,
     });
@@ -394,153 +363,100 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
     ribbonMesh.castShadow = true;
     tailGroup.add(ribbonMesh);
 
-    // 4 Cute Little Yarn Tassels hanging from the bottom tip of the scarf tail!
     const endPt = curvePts[curvePts.length - 1];
     for (let f = -1.5; f <= 1.5; f += 1) {
-      const tassel = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.014, 0.042, 8, 10),
-        fringeMat
-      );
-      const offsetAngle = endAngle + f * 0.055;
+      const tassel = new THREE.Mesh(new THREE.CapsuleGeometry(0.013, 0.038, 8, 10), fringeMat);
+      const offsetAngle = endAngle + f * 0.05;
       const tr = (findBodyRadiusAtAngle(endY, offsetAngle) + protrude) * S;
-      tassel.position.set(
-        Math.sin(offsetAngle) * tr,
-        endPt.y - 0.036,
-        Math.cos(offsetAngle) * tr
-      );
-      tassel.rotation.z = -offsetAngle * 0.25;
+      tassel.position.set(Math.sin(offsetAngle) * tr, endPt.y - 0.032, Math.cos(offsetAngle) * tr);
+      tassel.rotation.z = -offsetAngle * 0.22;
       tailGroup.add(tassel);
     }
 
     return tailGroup;
   };
 
-  // Longer front scarf tail & shorter under-layered tail hugging the belly contour!
-  group.add(buildDrapedTail(0.36, 0.44, -0.07, -0.34, 0.018, 1.0));
-  group.add(buildDrapedTail(0.50, 0.62, -0.07, -0.25, 0.008, 0.88));
+  group.add(buildDrapedTail(0.34, 0.42, -0.06, -0.31, 0.016, 1.0));
+  group.add(buildDrapedTail(0.47, 0.58, -0.06, -0.23, 0.008, 0.86));
 
   return group;
 }
 
 /**
- * Builds Face-Wrapped Designer-Toy Cartoon Eyeglasses (matching reference screenshot!):
- * - Contoured 3D rounded-trapezoid dark-slate frames wrapped smoothly onto `findFaceSurfaceZ(x, y)`
- * - Saddle arch bridge sitting snugly right over the top curve of the snout
- * - Curved glossy cartoon lenses with cute diagonal white anime glint reflection
- * - Flush temple arms hugging the sides of the head
+ * Iconic Continuous-Brow Nerd-Chic Glasses (1:1 Tribute to User's Favorite Reference Image!):
+ * - Soft velvety slate-navy (`#323c50`) continuous gentle brow bar across top of the big round nose
+ * - Clean, bright, unobstructed eye windows (ZERO distracting diagonal stripes!) so tiny deadpan dot pupils shine!
+ * - Wrapped smoothly around the wide marshmallow head with flush side hinges
  */
-export function buildDetailedGlasses(
-  S: number,
-  eyeY: number,
-  _eyeZ: number,
-  _eyeSurfX: number
-): THREE.Group {
+export function buildDetailedGlasses(S: number, eyeY: number): THREE.Group {
   const group = new THREE.Group();
 
   const frameMat = new THREE.MeshStandardMaterial({
-    color: 0x262e3d,
-    roughness: 0.32,
-    metalness: 0.12,
+    color: 0x313b4e,
+    roughness: 0.46,
+    metalness: 0.08,
   });
 
-  // Crisp cartoon lens texture with subtle sky tint + diagonal white anime reflection glint!
-  const lensCanvas = document.createElement("canvas");
-  lensCanvas.width = 128;
-  lensCanvas.height = 128;
-  const lctx = lensCanvas.getContext("2d")!;
-  lctx.fillStyle = "rgba(219, 238, 255, 0.22)";
-  lctx.fillRect(0, 0, 128, 128);
-  lctx.strokeStyle = "rgba(255, 255, 255, 0.62)";
-  lctx.lineWidth = 14;
-  lctx.lineCap = "round";
-  lctx.beginPath();
-  lctx.moveTo(26, 96);
-  lctx.lineTo(86, 26);
-  lctx.stroke();
-  lctx.lineWidth = 6;
-  lctx.beginPath();
-  lctx.moveTo(54, 102);
-  lctx.lineTo(102, 46);
-  lctx.stroke();
-  const lensTex = new THREE.CanvasTexture(lensCanvas);
-  lensTex.colorSpace = THREE.SRGBColorSpace;
-
-  const lensMat = new THREE.MeshStandardMaterial({
-    map: lensTex,
+  // Clean, ultra-clear subtle glass sheen (zero stripes blocking the tiny dot eyes!)
+  const clearLensMat = new THREE.MeshStandardMaterial({
+    color: 0xf8fbff,
     transparent: true,
-    opacity: 0.85,
-    roughness: 0.12,
-    metalness: 0.1,
-    side: THREE.DoubleSide,
+    opacity: 0.16,
+    roughness: 0.15,
+    metalness: 0.05,
     depthWrite: false,
   });
 
-  // Smooth optical eyewear arc guaranteed >= faceSurface + 0.032 clearance so rims & bridge NEVER clip into snout!
   const eyewearZ = (x: number, y: number) => {
-    const opticalArc = 0.446 - 1.18 * x * x;
-    const minClear = findFaceSurfaceZ(x, y) + 0.032;
+    const opticalArc = 0.435 - 1.12 * x * x;
+    const minClear = findFaceSurfaceZ(x, y) + 0.024;
     return Math.max(opticalArc, minClear);
   };
 
-  const sampleRoundedLensLoop = (
-    cx: number,
-    cy: number,
-    hw: number,
-    hh: number,
-    side: number,
-    steps: number
-  ): THREE.Vector3[] => {
+  const centerX = 0.238;
+  const centerY = eyeY + 0.002;
+  const halfW = 0.098;
+  const halfH = 0.075;
+
+  [-1, 1].forEach((side) => {
+    const cx = side * centerX;
     const pts: THREE.Vector3[] = [];
+    const steps = 48;
     for (let i = 0; i < steps; i++) {
       const a = (i / steps) * Math.PI * 2;
       const cosA = Math.cos(a);
       const sinA = Math.sin(a);
-      const powCos = Math.sign(cosA) * Math.pow(Math.abs(cosA), 0.68);
-      const powSin = Math.sign(sinA) * Math.pow(Math.abs(sinA), 0.68);
-      const noseContour = sinA < 0 && side * cosA < 0 ? 0.88 : 1.0;
-      const lx = cx + powCos * hw * noseContour;
-      const ly = cy + powSin * hh;
+      // Rectangular-rounded boxy nerd frame (exponent 0.52 -> crisp rounded rectangle like reference!)
+      const powCos = Math.sign(cosA) * Math.pow(Math.abs(cosA), 0.52);
+      const powSin = Math.sign(sinA) * Math.pow(Math.abs(sinA), 0.54);
+      // Slight inward curve at bottom-inner corner to hug the big round nose
+      const innerTaper = sinA < 0 && side * cosA < 0 ? 0.84 : 1.0;
+      const lx = cx + powCos * halfW * innerTaper;
+      const ly = centerY + powSin * halfH;
       const wz = eyewearZ(lx, ly) * S;
       pts.push(new THREE.Vector3(lx * S, ly * S, wz));
     }
-    return pts;
-  };
 
-  const centerX = 0.208;
-  const centerY = eyeY + 0.004;
-  const halfW = 0.078;
-  const halfH = 0.064;
-
-  [-1, 1].forEach((side) => {
-    const cx = side * centerX;
-    const loopPts = sampleRoundedLensLoop(cx, centerY, halfW, halfH, side, 44);
-    const frameCurve = new THREE.CatmullRomCurve3(loopPts, true, "catmullrom", 0.5);
+    const frameCurve = new THREE.CatmullRomCurve3(pts, true, "catmullrom", 0.5);
     const rimMesh = new THREE.Mesh(
-      new THREE.TubeGeometry(frameCurve, 64, 0.017 * S, 16, true),
+      new THREE.TubeGeometry(frameCurve, 72, 0.019 * S, 16, true),
       frameMat
     );
     rimMesh.castShadow = true;
     group.add(rimMesh);
 
-    // Smoothly curved lens inside the optical rim!
-    const gridN = 8;
-    const positions: number[] = [];
-    const uvs: number[] = [];
-    const indices: number[] = [];
+    // Subtle clear lens plane curved inside rim
+    const gridN = 6;
+    const pos: number[] = [];
+    const idx: number[] = [];
     for (let iy = 0; iy <= gridN; iy++) {
-      const v = iy / gridN;
-      const ny = (v * 2 - 1) * 0.88;
+      const ny = ((iy / gridN) * 2 - 1) * 0.88;
       for (let ix = 0; ix <= gridN; ix++) {
-        const u = ix / gridN;
-        const nx = (u * 2 - 1) * 0.88;
-        const rLen = Math.pow(Math.abs(nx), 3.0) + Math.pow(Math.abs(ny), 3.0);
-        const scaleBack = rLen > 1 ? 1 / Math.pow(rLen, 1 / 3.0) : 1.0;
-        const noseContour = ny < 0 && side * nx < 0 ? 0.88 : 1.0;
-        const px = cx + nx * scaleBack * halfW * noseContour;
-        const py = centerY + ny * scaleBack * halfH;
+        const nx = ((ix / gridN) * 2 - 1) * 0.88;
+        const px = cx + nx * halfW * 0.92;
+        const py = centerY + ny * halfH * 0.92;
         const pz = eyewearZ(px, py) - 0.004;
-        positions.push(px * S, py * S, pz * S);
-        uvs.push(u, v);
+        pos.push(px * S, py * S, pz * S);
       }
     }
     for (let iy = 0; iy < gridN; iy++) {
@@ -549,67 +465,64 @@ export function buildDetailedGlasses(
         const b = a + 1;
         const c = a + (gridN + 1);
         const d = c + 1;
-        indices.push(a, b, d, a, d, c);
+        idx.push(a, b, d, a, d, c);
       }
     }
-    const curvedLensGeo = new THREE.BufferGeometry();
-    curvedLensGeo.setAttribute("position", new THREE.Float32BufferAttribute(positions, 3));
-    curvedLensGeo.setAttribute("uv", new THREE.Float32BufferAttribute(uvs, 2));
-    curvedLensGeo.setIndex(indices);
-    curvedLensGeo.computeVertexNormals();
-    group.add(new THREE.Mesh(curvedLensGeo, lensMat));
+    const lGeo = new THREE.BufferGeometry();
+    lGeo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+    lGeo.setIndex(idx);
+    lGeo.computeVertexNormals();
+    group.add(new THREE.Mesh(lGeo, clearLensMat));
 
-    // Outer Corner Hinge Lug + Temple Arm tucking neatly into the side of the head!
-    const outerX = side * (centerX + halfW * 0.98);
-    const outerY = centerY + 0.012;
+    // Cute side hinge lug + short temple tucking into side of wide head
+    const outerX = side * (centerX + halfW * 1.02);
+    const outerY = centerY + 0.015;
     const outerZ = eyewearZ(outerX, outerY);
-
-    const lug = new THREE.Mesh(new THREE.BoxGeometry(0.022 * S, 0.020 * S, 0.024 * S), frameMat);
+    const lug = new THREE.Mesh(
+      new THREE.BoxGeometry(0.028 * S, 0.036 * S, 0.032 * S),
+      frameMat
+    );
     lug.position.set(outerX * S, outerY * S, outerZ * S);
-    lug.rotation.y = side * 0.35;
+    lug.rotation.y = side * 0.28;
     group.add(lug);
 
     const endSurfX = findSurfaceX(outerY - 0.01, 0.04);
     const templeCurve = new THREE.CatmullRomCurve3([
       new THREE.Vector3(outerX * S, outerY * S, outerZ * S),
-      new THREE.Vector3(side * (endSurfX + 0.008) * S, outerY * S, 0.16 * S),
-      new THREE.Vector3(side * (endSurfX - 0.01) * S, (outerY - 0.012) * S, 0.02 * S),
+      new THREE.Vector3(side * (endSurfX + 0.01) * S, outerY * S, 0.16 * S),
+      new THREE.Vector3(side * (endSurfX - 0.01) * S, (outerY - 0.01) * S, 0.02 * S),
     ]);
-    const templeMesh = new THREE.Mesh(
-      new THREE.TubeGeometry(templeCurve, 18, 0.013 * S, 12, false),
-      frameMat
+    group.add(
+      new THREE.Mesh(new THREE.TubeGeometry(templeCurve, 16, 0.015 * S, 12, false), frameMat)
     );
-    group.add(templeMesh);
   });
 
-  // Smooth Saddle Arch Bridge resting visibly on top of the snout behind the black nose!
-  const bridgePts: THREE.Vector3[] = [];
-  const innerEdgeX = centerX - halfW * 0.94;
-  for (let i = 0; i <= 14; i++) {
-    const u = (i / 14) * 2 - 1;
-    const bx = u * innerEdgeX;
-    const archLift = (1 - u * u) * 0.032;
-    const by = centerY + 0.016 + archLift;
-    const bz = eyewearZ(bx, by) + (1 - u * u) * 0.008;
-    bridgePts.push(new THREE.Vector3(bx * S, by * S, bz * S));
+  // Continuous Bold Brow-Bridge Arch connecting the top-inner corners smoothly over the big round nose!
+  const browPts: THREE.Vector3[] = [];
+  const spanX = centerX - halfW * 0.65;
+  for (let i = 0; i <= 16; i++) {
+    const u = (i / 16) * 2 - 1;
+    const bx = u * spanX;
+    const archY = centerY + halfH * 0.88 + (1 - u * u) * 0.016;
+    const bz = Math.max(eyewearZ(bx, archY), 0.448 - 0.35 * bx * bx);
+    browPts.push(new THREE.Vector3(bx * S, archY * S, bz * S));
   }
-  const bridgeCurve = new THREE.CatmullRomCurve3(bridgePts);
-  const bridgeMesh = new THREE.Mesh(
-    new THREE.TubeGeometry(bridgeCurve, 24, 0.016 * S, 14, false),
+  const browMesh = new THREE.Mesh(
+    new THREE.TubeGeometry(new THREE.CatmullRomCurve3(browPts), 28, 0.020 * S, 14, false),
     frameMat
   );
-  bridgeMesh.castShadow = true;
-  group.add(bridgeMesh);
+  browMesh.castShadow = true;
+  group.add(browMesh);
 
   return group;
 }
 
 /**
- * Builds a Ribbed Knitted Winter Beanie sitting snugly & jauntily between the ears!
+ * Ribbed Knitted Winter Beanie fitted between wide-set ears
  */
 export function buildKnittedBeanie(S: number): THREE.Group {
   const group = new THREE.Group();
-  const { map, bumpMap } = createKnittedTextures("#293548", "#fbbf24");
+  const { map, bumpMap } = createKnittedTextures("#313b4e", "#fbbf24");
   const hatMat = new THREE.MeshStandardMaterial({
     map,
     bumpMap,
@@ -629,41 +542,28 @@ export function buildKnittedBeanie(S: number): THREE.Group {
 
   const sub = new THREE.Group();
   const dome = new THREE.Mesh(
-    new THREE.SphereGeometry(0.195 * S, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.58),
+    new THREE.SphereGeometry(0.18 * S, 28, 20, 0, Math.PI * 2, 0, Math.PI * 0.58),
     hatMat
   );
-  dome.scale.set(1.05, 0.95, 1.05);
-
   const cuff = new THREE.Mesh(
-    new THREE.TorusGeometry(0.19 * S, 0.042 * S, 16, 36),
+    new THREE.TorusGeometry(0.175 * S, 0.038 * S, 16, 36),
     cuffMat
   );
   cuff.rotation.x = Math.PI / 2;
-  cuff.position.y = 0.015 * S;
+  cuff.position.y = 0.012 * S;
 
   const pomGroup = new THREE.Group();
-  pomGroup.position.set(0, 0.21 * S, 0);
-  pomGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.056 * S, 16, 16), pomMat));
-  for (let i = 0; i < 8; i++) {
-    const a = (i / 8) * Math.PI * 2;
-    const tuft = new THREE.Mesh(new THREE.SphereGeometry(0.03 * S, 10, 10), pomMat);
-    tuft.position.set(
-      Math.cos(a) * 0.035 * S,
-      Math.sin(a * 2) * 0.015 * S,
-      Math.sin(a) * 0.035 * S
-    );
-    pomGroup.add(tuft);
-  }
-
+  pomGroup.position.set(0, 0.195 * S, 0);
+  pomGroup.add(new THREE.Mesh(new THREE.SphereGeometry(0.052 * S, 16, 16), pomMat));
   sub.add(dome, cuff, pomGroup);
-  sub.position.set(0, 0.395 * S, -0.025 * S);
-  sub.rotation.x = -0.14; // Cute jaunty tilt slightly backward so it clears face & speech bubble!
+  sub.position.set(0, 0.44 * S, -0.02 * S);
+  sub.rotation.x = -0.14;
   group.add(sub);
   return group;
 }
 
 /**
- * Builds Cute Detailed Plush Earmuffs with Fleece Cushions & Headband!
+ * Plush Earmuffs
  */
 export function buildPlushEarmuffs(S: number): THREE.Group {
   const group = new THREE.Group();
@@ -672,25 +572,24 @@ export function buildPlushEarmuffs(S: number): THREE.Group {
   const whiteFleece = new THREE.MeshStandardMaterial({ color: 0xfffdf9, roughness: 0.96 });
 
   const bandCurve = new THREE.CatmullRomCurve3([
-    new THREE.Vector3(-0.34 * S, 0.34 * S, -0.01 * S),
-    new THREE.Vector3(-0.24 * S, 0.50 * S, -0.01 * S),
-    new THREE.Vector3(0, 0.54 * S, -0.01 * S),
-    new THREE.Vector3(0.24 * S, 0.50 * S, -0.01 * S),
-    new THREE.Vector3(0.34 * S, 0.34 * S, -0.01 * S),
+    new THREE.Vector3(-0.39 * S, 0.34 * S, 0),
+    new THREE.Vector3(-0.28 * S, 0.52 * S, 0),
+    new THREE.Vector3(0, 0.56 * S, 0),
+    new THREE.Vector3(0.28 * S, 0.52 * S, 0),
+    new THREE.Vector3(0.39 * S, 0.34 * S, 0),
   ]);
-  const band = new THREE.Mesh(new THREE.TubeGeometry(bandCurve, 28, 0.022, 12, false), bandMat);
-  group.add(band);
+  group.add(new THREE.Mesh(new THREE.TubeGeometry(bandCurve, 28, 0.02, 12, false), bandMat));
 
   [-1, 1].forEach((side) => {
     const cup = new THREE.Group();
-    const cushion = new THREE.Mesh(new THREE.TorusGeometry(0.075 * S, 0.038 * S, 14, 24), whiteFleece);
+    const cushion = new THREE.Mesh(new THREE.TorusGeometry(0.072 * S, 0.036 * S, 14, 24), whiteFleece);
     cushion.rotation.y = Math.PI / 2;
-    const outer = new THREE.Mesh(new THREE.SphereGeometry(0.095 * S, 20, 20), pinkPlush);
+    const outer = new THREE.Mesh(new THREE.SphereGeometry(0.092 * S, 20, 20), pinkPlush);
     outer.scale.set(0.58, 1, 1);
-    outer.position.x = side * 0.022 * S;
+    outer.position.x = side * 0.02 * S;
     cup.add(cushion, outer);
-    cup.position.set(side * 0.34 * S, 0.33 * S, -0.01 * S);
-    cup.rotation.z = -side * 0.18;
+    cup.position.set(side * 0.39 * S, 0.33 * S, 0);
+    cup.rotation.z = -side * 0.15;
     group.add(cup);
   });
 
@@ -698,13 +597,13 @@ export function buildPlushEarmuffs(S: number): THREE.Group {
 }
 
 /**
- * Builds a Cute Detailed Plush Silver Codfish Toy!
+ * Cute Plush Silver Codfish
  */
 export function buildCuteCodfish(): THREE.Group {
   const g = new THREE.Group();
   const blueMat = new THREE.MeshStandardMaterial({ color: 0x60a5fa, roughness: 0.55 });
   const bellyMat = new THREE.MeshStandardMaterial({ color: 0xe0f2fe, roughness: 0.65 });
-  const eyeDark = new THREE.MeshStandardMaterial({ color: 0x1e293b, roughness: 0.3 });
+  const eyeDark = new THREE.MeshStandardMaterial({ color: 0x313b4e, roughness: 0.3 });
 
   const body = new THREE.Mesh(new THREE.SphereGeometry(0.11, 22, 18), blueMat);
   body.scale.set(1.65, 0.88, 0.65);
@@ -712,25 +611,20 @@ export function buildCuteCodfish(): THREE.Group {
   belly.scale.set(1.5, 0.72, 0.68);
   belly.position.y = -0.022;
 
-  // Cute heart-lobed tail fin
   const tailTop = new THREE.Mesh(new THREE.SphereGeometry(0.055, 14, 12), blueMat);
   tailTop.scale.set(1.3, 0.65, 0.35);
-  tailTop.position.set(0.20, 0.035, 0);
+  tailTop.position.set(0.2, 0.035, 0);
   tailTop.rotation.z = 0.45;
 
   const tailBot = tailTop.clone();
-  tailBot.position.set(0.20, -0.035, 0);
+  tailBot.position.set(0.2, -0.035, 0);
   tailBot.rotation.z = -0.45;
 
-  const dorsal = new THREE.Mesh(new THREE.SphereGeometry(0.045, 12, 10), blueMat);
-  dorsal.scale.set(1.4, 0.6, 0.3);
-  dorsal.position.set(0.02, 0.09, 0);
-
   const eyeL = new THREE.Mesh(new THREE.SphereGeometry(0.018, 12, 12), eyeDark);
-  eyeL.position.set(-0.10, 0.02, 0.058);
+  eyeL.position.set(-0.1, 0.02, 0.058);
   const eyeR = eyeL.clone();
   eyeR.position.z = -0.058;
 
-  g.add(body, belly, tailTop, tailBot, dorsal, eyeL, eyeR);
+  g.add(body, belly, tailTop, tailBot, eyeL, eyeR);
   return g;
 }

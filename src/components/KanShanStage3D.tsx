@@ -31,10 +31,6 @@ function smin(a: number, b: number, k: number): number {
   return Math.min(a, b) - h * h * k * 0.25;
 }
 
-function smax(a: number, b: number, k: number): number {
-  return -smin(-a, -b, k);
-}
-
 function sdSphere(
   px: number,
   py: number,
@@ -62,15 +58,22 @@ export default function KanShanStage3D({
   const stackingRef = useRef(isStackingSnow);
   const bagRef = useRef(isBagCharmMode);
   const recRef = useRef(isRecordingNose);
-  const springRef = useRef({ sx: 1, sy: 1, sz: 1, jumpY: 0, armLerp: 0 });
-  const rotYRef = useRef(-0.18);
+  const springRef = useRef({
+    sx: 1,
+    sy: 1,
+    sz: 1,
+    jumpY: 0,
+    armLerp: 0,
+    waveTimer: 0,
+  });
+  const rotYRef = useRef(-0.08); // Nearly straight-on cozy sitting pose like reference!
 
   useEffect(() => {
     petRef.current = pet;
     springRef.current.sx = 1.06;
     springRef.current.sy = 0.94;
     springRef.current.sz = 1.06;
-    springRef.current.jumpY = 0.09;
+    springRef.current.jumpY = 0.08;
   }, [pet.equippedItems, pet.mood]);
 
   useEffect(() => {
@@ -79,7 +82,7 @@ export default function KanShanStage3D({
 
   useEffect(() => {
     stackingRef.current = isStackingSnow;
-    springRef.current.jumpY = 0.1;
+    springRef.current.jumpY = 0.09;
   }, [isStackingSnow]);
 
   useEffect(() => {
@@ -105,9 +108,9 @@ export default function KanShanStage3D({
       if (w <= 0 || h <= 0) return;
       const aspect = w / h;
       camera.aspect = aspect;
-      const extraZ = aspect < 0.72 ? (0.72 - aspect) * 6.2 : 0;
-      camera.position.set(0, 0.36, 9.4 + extraZ);
-      camera.lookAt(0, -0.18, 0);
+      const extraZ = aspect < 0.72 ? (0.72 - aspect) * 9.2 : 0;
+      camera.position.set(0, 0.48, 9.5 + extraZ);
+      camera.lookAt(0, -0.32, 0);
       camera.updateProjectionMatrix();
       renderer.setSize(w, h, false);
     };
@@ -120,56 +123,65 @@ export default function KanShanStage3D({
     renderer.shadowMap.enabled = true;
     renderer.shadowMap.type = THREE.PCFSoftShadowMap;
     renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    renderer.toneMappingExposure = 1.08;
+    renderer.toneMappingExposure = 1.06;
     syncCameraAndSize(width, height);
 
     container.innerHTML = "";
     container.appendChild(renderer.domElement);
 
     // =========================================================
-    // BLIND-BOX SOFT TOON-VINYL LIGHTING (Warm highlights, sky-tinted shadows, zero grey mud!)
+    // DREAMY BLIND-BOX STUDIO LIGHTING
     // =========================================================
-    const hemiLight = new THREE.HemisphereLight(0xfffefa, 0xdbeafe, 1.68);
+    const hemiLight = new THREE.HemisphereLight(0xffffff, 0xd4e6fb, 1.65);
     scene.add(hemiLight);
 
-    const keyLight = new THREE.DirectionalLight(0xfffdf9, 1.05);
-    keyLight.position.set(-2.8, 6.2, 5.8);
+    const keyLight = new THREE.DirectionalLight(0xfffefa, 1.05);
+    keyLight.position.set(-2.6, 6.2, 5.6);
     keyLight.castShadow = true;
     keyLight.shadow.mapSize.width = 1024;
     keyLight.shadow.mapSize.height = 1024;
     keyLight.shadow.radius = 5;
     scene.add(keyLight);
 
-    // Frontal fill light keeps cartoon white belly bright & creamy
-    const frontFill = new THREE.DirectionalLight(0xf0f7ff, 0.45);
-    frontFill.position.set(1.5, 0.5, 5.5);
+    const frontFill = new THREE.DirectionalLight(0xf2f8ff, 0.48);
+    frontFill.position.set(1.8, 0.8, 5.5);
     scene.add(frontFill);
 
-    const rimLight = new THREE.DirectionalLight(0xffffff, 0.55);
-    rimLight.position.set(3.5, 3.0, -3.5);
-    scene.add(rimLight);
-
     // =========================================================
-    // 1. ARCTIC ROOM PROPS: SHELL SOFA + GIANT PAW RUG
+    // 1. ARCTIC ROOM PROPS: SHELL SOFA + PLUSH PAW RUG + ICE GLOW
     // =========================================================
     const roomGroup = new THREE.Group();
     scene.add(roomGroup);
 
     const floorShadow = new THREE.Mesh(
       new THREE.PlaneGeometry(24, 24),
-      new THREE.ShadowMaterial({ opacity: 0.11 })
+      new THREE.ShadowMaterial({ opacity: 0.12 })
     );
     floorShadow.rotation.x = -Math.PI / 2;
-    floorShadow.position.y = -1.42;
+    floorShadow.position.y = -1.38;
     floorShadow.receiveShadow = true;
     roomGroup.add(floorShadow);
 
-    // Plush Shell Sofa
+    // Soft Vertical Ice Reflection Glow on Foreground Floor (like reference!)
+    const iceSheen = new THREE.Mesh(
+      new THREE.CircleGeometry(1.15, 36),
+      new THREE.MeshBasicMaterial({
+        color: 0xffffff,
+        transparent: true,
+        opacity: 0.24,
+      })
+    );
+    iceSheen.rotation.x = -Math.PI / 2;
+    iceSheen.scale.set(0.85, 1.35, 1);
+    iceSheen.position.set(0, -1.378, 1.25);
+    roomGroup.add(iceSheen);
+
+    // Plush Shell Sofa in Back-Left
     const sofaGroup = new THREE.Group();
-    sofaGroup.position.set(-1.32, -1.4, -1.55);
+    sofaGroup.position.set(-1.26, -1.36, -1.45);
     sofaGroup.rotation.y = 0.36;
-    const sofaBlue = new THREE.MeshStandardMaterial({ color: 0xb4d3f2, roughness: 0.92 });
-    const sofaFrost = new THREE.MeshStandardMaterial({ color: 0xdcf0ff, roughness: 0.94 });
+    const sofaBlue = new THREE.MeshStandardMaterial({ color: 0xb2d2f2, roughness: 0.93 });
+    const sofaFrost = new THREE.MeshStandardMaterial({ color: 0xdcf0ff, roughness: 0.95 });
 
     const seat = new THREE.Mesh(new THREE.CylinderGeometry(1.0, 0.95, 0.4, 36), sofaBlue);
     seat.scale.set(1.16, 1, 0.86);
@@ -196,35 +208,35 @@ export default function KanShanStage3D({
     });
     roomGroup.add(sofaGroup);
 
-    // Giant Blue & White Paw Rug
+    // Thick Puffy Blue & White Paw Rug
     const pawRug = new THREE.Group();
-    pawRug.position.set(0, -1.41, 0.08);
-    const rugBlue = new THREE.MeshStandardMaterial({ color: 0x8cc0f6, roughness: 0.94 });
-    const rugWhite = new THREE.MeshStandardMaterial({ color: 0xfafcff, roughness: 0.96 });
+    pawRug.position.set(0, -1.37, 0.12);
+    const rugBlue = new THREE.MeshStandardMaterial({ color: 0x8bc0f7, roughness: 0.95 });
+    const rugWhite = new THREE.MeshStandardMaterial({ color: 0xfbfdff, roughness: 0.96 });
 
-    const padB = new THREE.Mesh(new THREE.CylinderGeometry(1.55, 1.6, 0.055, 48), rugBlue);
+    const padB = new THREE.Mesh(new THREE.CylinderGeometry(1.52, 1.58, 0.075, 48), rugBlue);
     padB.scale.set(1.26, 1, 0.78);
-    padB.position.set(0, 0.028, 0.15);
+    padB.position.set(0, 0.038, 0.15);
     padB.receiveShadow = true;
-    const padW = new THREE.Mesh(new THREE.CylinderGeometry(1.24, 1.28, 0.068, 48), rugWhite);
+    const padW = new THREE.Mesh(new THREE.CylinderGeometry(1.20, 1.24, 0.092, 48), rugWhite);
     padW.scale.set(1.2, 1, 0.74);
-    padW.position.set(0, 0.034, 0.17);
+    padW.position.set(0, 0.046, 0.17);
     padW.receiveShadow = true;
     pawRug.add(padB, padW);
 
     [
-      { x: -1.68, z: -0.2, r: 0.34 },
-      { x: -0.68, z: -0.8, r: 0.12 },
-      { x: 0.68, z: -0.8, r: -0.12 },
-      { x: 1.68, z: -0.2, r: -0.34 },
+      { x: -1.64, z: -0.2, r: 0.34 },
+      { x: -0.66, z: -0.78, r: 0.12 },
+      { x: 0.66, z: -0.78, r: -0.12 },
+      { x: 1.64, z: -0.2, r: -0.34 },
     ].forEach((t) => {
-      const bt = new THREE.Mesh(new THREE.CylinderGeometry(0.54, 0.56, 0.054, 28), rugBlue);
+      const bt = new THREE.Mesh(new THREE.CylinderGeometry(0.52, 0.55, 0.072, 28), rugBlue);
       bt.scale.set(1.04, 1, 0.82);
-      bt.position.set(t.x, 0.027, t.z);
+      bt.position.set(t.x, 0.036, t.z);
       bt.rotation.y = t.r;
       bt.receiveShadow = true;
-      const wt = new THREE.Mesh(new THREE.CylinderGeometry(0.36, 0.37, 0.066, 28), rugWhite);
-      wt.position.set(t.x * 0.96, 0.033, t.z * 0.96);
+      const wt = new THREE.Mesh(new THREE.CylinderGeometry(0.35, 0.36, 0.088, 28), rugWhite);
+      wt.position.set(t.x * 0.96, 0.044, t.z * 0.96);
       wt.rotation.y = t.r;
       wt.receiveShadow = true;
       pawRug.add(bt, wt);
@@ -232,67 +244,64 @@ export default function KanShanStage3D({
     roomGroup.add(pawRug);
 
     // =========================================================
-    // 2. CARTOON Q-VERSION BLIND-BOX LIU KANSHAN
+    // 2. SITTING MARSHMALLOW LIU KANSHAN (1:1 BLIND-BOX PROPORTIONS!)
     // =========================================================
     const charRoot = new THREE.Group();
-    charRoot.position.set(0, -0.25, 0.12);
+    // Sitting squarely right on the puffy white paw rug!
+    charRoot.position.set(0, -0.58, 0.16);
     scene.add(charRoot);
 
-    const S = 1.38;
+    const S = 1.46;
 
     // Bag Charm Lanyard
     const lanyardGroup = new THREE.Group();
     const strap = new THREE.Mesh(
       new THREE.CylinderGeometry(0.048, 0.048, 0.82, 16),
-      new THREE.MeshStandardMaterial({ color: 0x3b82f6, roughness: 0.55 })
+      new THREE.MeshStandardMaterial({ color: 0x4a8df8, roughness: 0.55 })
     );
-    strap.position.set(0, 1.25, -0.02);
+    strap.position.set(0, 1.32, -0.02);
     const clasp = new THREE.Mesh(
       new THREE.TorusGeometry(0.18, 0.036, 16, 32),
       new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.88, roughness: 0.18 })
     );
-    clasp.position.set(0, 1.72, -0.02);
+    clasp.position.set(0, 1.78, -0.02);
     lanyardGroup.add(strap, clasp);
     charRoot.add(lanyardGroup);
 
     const kanshanRig = new THREE.Group();
     charRoot.add(kanshanRig);
 
-    // Soft Matte-Velvet Vinyl Materials (Cartoon Designer Toy Finish!)
+    // Designer-Toy Soft Flocked / Matte Vinyl Materials!
     const vinylWhiteMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      roughness: 0.68,
+      roughness: 0.72,
       metalness: 0.0,
       emissive: 0xf4f8ff,
-      emissiveIntensity: 0.12, // Subtle subsurface warmth prevents grey shadows!
+      emissiveIntensity: 0.11,
     });
-    const limbCharcoalMat = new THREE.MeshStandardMaterial({
-      color: 0x23262e,
-      roughness: 0.55,
+    // Low-saturation velvety dark slate-navy (NOT harsh dead #000000!)
+    const velvetSlateMat = new THREE.MeshStandardMaterial({
+      color: 0x354054,
+      roughness: 0.68,
+      metalness: 0.02,
+    });
+    const noseRubberMat = new THREE.MeshStandardMaterial({
+      color: 0x343f53,
+      roughness: 0.62,
       metalness: 0.03,
     });
-    const noseBeanMat = new THREE.MeshStandardMaterial({
-      color: 0x1d2027,
-      roughness: 0.36,
-      metalness: 0.06,
-    });
-    const eyeBeadMat = new THREE.MeshStandardMaterial({
-      color: 0x181a20,
-      roughness: 0.22,
-      metalness: 0.08,
-    });
-    const blushMat = new THREE.MeshStandardMaterial({
-      color: 0xfda4af,
-      roughness: 0.85,
-      transparent: true,
-      opacity: 0.32,
+    const pupilMat = new THREE.MeshStandardMaterial({
+      color: 0x1e2532,
+      roughness: 0.45,
+      metalness: 0.02,
     });
 
-    // A) Silky Analytical-Normal UNCUT White Body + Plump Ears + Fluffy Tail (zero black belly bleed!)
+    // A) 1:1 Wide-Head Marshmallow Sitting Body + Plump Tail
     const whiteBodyMesh = buildSmoothSDFMesh(76, vinylWhiteMat, (x, y, z) => {
       const dBody = evalCartoonKanshanSDF(x, y, z);
-      const dTail = sdSphere(x, y, z, 0, -0.35, -0.41, 0.135);
-      return smin(dBody, dTail, 0.042);
+      // Plump fluffy fox tail resting on the rug behind (-Y=-0.34) for 3-point blind-box stability!
+      const dTail = sdSphere(x, y, z, 0, -0.32, -0.44, 0.148);
+      return smin(dBody, dTail, 0.048);
     });
     whiteBodyMesh.scale.setScalar(S);
     whiteBodyMesh.castShadow = true;
@@ -300,181 +309,172 @@ export default function KanShanStage3D({
     whiteBodyMesh.name = "head";
     kanshanRig.add(whiteBodyMesh);
 
-    // B) Crisp, Self-Contained Plump Cartoon Oval Black Nose Bean nestled on the muzzle tip!
+    // B)Two Chubby Marshmallow Sitting Short Feet in Front (Exact match to reference!)
+    [-1, 1].forEach((side) => {
+      const foot = new THREE.Mesh(
+        new THREE.CapsuleGeometry(0.145, 0.16, 18, 24),
+        vinylWhiteMat
+      );
+      foot.rotation.x = Math.PI / 2;
+      foot.scale.set(0.96, 1.0, 0.88);
+      foot.position.set(side * 0.28, -0.56, 0.48);
+      foot.castShadow = true;
+      foot.receiveShadow = true;
+      kanshanRig.add(foot);
+    });
+
+    // C) Plump Velvety Round-Oval Rubber Nose Button (soft diffused sheen, zero harsh glare!)
     const blackNoseMesh = new THREE.Mesh(
       new THREE.SphereGeometry(1, 48, 36),
-      noseBeanMat
+      noseRubberMat
     );
-    blackNoseMesh.scale.set(0.175 * S, 0.120 * S, 0.132 * S);
-    blackNoseMesh.position.set(0, 0.198 * S, 0.448 * S);
-    blackNoseMesh.rotation.x = 0.06;
+    blackNoseMesh.scale.set(0.165 * S, 0.145 * S, 0.132 * S);
+    blackNoseMesh.position.set(0, 0.185 * S, 0.435 * S);
     blackNoseMesh.castShadow = true;
     blackNoseMesh.name = "nose";
     kanshanRig.add(blackNoseMesh);
 
-    // Subtle Inner Ear Soft Blush & Cheek Blush Pads for Extra Cartoon Charm!
-    [-1, 1].forEach((side) => {
-      const innerEar = new THREE.Mesh(new THREE.ConeGeometry(0.068, 0.18, 16), blushMat);
-      innerEar.scale.set(1, 1, 0.28);
-      innerEar.position.set(side * 0.19 * S, 0.45 * S, 0.045 * S);
-      innerEar.rotation.z = -side * 0.12;
-      kanshanRig.add(innerEar);
-    });
-
-    // C) Forward-Facing Expressive Cartoon Bead Eyes (centered inside glasses & visible in 3/4!)
-    const eyeX = 0.212;
-    const eyeY = 0.252;
+    // D) Iconic Minimalist Deadpan Small Dot Eyes (`•    •` — NO messy anime highlights!)
+    const eyeX = 0.242;
+    const eyeY = 0.238;
     const eyeZ = findFaceSurfaceZ(eyeX, eyeY);
-    const eyeSurfX = eyeX;
 
     const beadEyesGroup = new THREE.Group();
-    const catchlightMat = new THREE.MeshBasicMaterial({ color: 0xffffff });
-    const createBeadEye = (side: number) => {
-      const eg = new THREE.Group();
-      const bead = new THREE.Mesh(new THREE.SphereGeometry(0.036, 20, 20), eyeBeadMat);
-      bead.scale.set(0.95, 1.15, 0.85);
-      const glint = new THREE.Mesh(new THREE.SphereGeometry(0.011, 10, 10), catchlightMat);
-      glint.position.set(-side * 0.008, 0.014, 0.030);
-      eg.add(bead, glint);
-      eg.position.set(side * eyeX * S, eyeY * S, (eyeZ + 0.004) * S);
-      eg.rotation.y = side * 0.24;
-      return eg;
+    const createDeadpanDotEye = (side: number) => {
+      const dot = new THREE.Mesh(new THREE.SphereGeometry(0.024 * S, 20, 20), pupilMat);
+      dot.scale.set(0.92, 1.18, 0.7);
+      dot.position.set(side * eyeX * S, eyeY * S, (eyeZ + 0.008) * S);
+      dot.rotation.y = side * 0.22;
+      return dot;
     };
-    const leftEye = createBeadEye(-1);
-    const rightEye = createBeadEye(1);
+    const leftEye = createDeadpanDotEye(-1);
+    const rightEye = createDeadpanDotEye(1);
     beadEyesGroup.add(leftEye, rightEye);
     kanshanRig.add(beadEyesGroup);
 
+    // Happy Crescent Smile Eyes (`^    ^` when patted, fed, or stacking snowballs!)
     const happyEyesGroup = new THREE.Group();
-    const arcGeo = new THREE.TorusGeometry(0.042, 0.013, 12, 24, Math.PI * 0.85);
+    const arcGeo = new THREE.TorusGeometry(0.038 * S, 0.011 * S, 12, 24, Math.PI * 0.85);
     [-1, 1].forEach((side) => {
-      const smile = new THREE.Mesh(arcGeo, eyeBeadMat);
-      smile.position.set(side * eyeX * S, (eyeY - 0.008) * S, (eyeZ + 0.012) * S);
-      smile.rotation.set(0.06, side * 0.26, Math.PI * 0.08);
+      const smile = new THREE.Mesh(arcGeo, pupilMat);
+      smile.position.set(side * eyeX * S, (eyeY - 0.006) * S, (eyeZ + 0.012) * S);
+      smile.rotation.set(0.05, side * 0.22, Math.PI * 0.08);
       happyEyesGroup.add(smile);
     });
     happyEyesGroup.visible = false;
     kanshanRig.add(happyEyesGroup);
 
-    // D) Cute Chubby Cartoon Standing Legs + Plump Rounded Shoes
-    [-1, 1].forEach((side) => {
-      const g = new THREE.Group();
-      const leg = new THREE.Mesh(
-        new THREE.CylinderGeometry(0.082, 0.078, 0.48, 24),
-        limbCharcoalMat
-      );
-      leg.position.set(side * 0.21, -0.91, 0.0);
-      leg.castShadow = true;
-
-      const boot = new THREE.Mesh(
-        new THREE.SphereGeometry(0.105, 22, 18),
-        limbCharcoalMat
-      );
-      boot.scale.set(0.96, 0.72, 1.38);
-      boot.position.set(side * 0.21, -1.13, 0.055);
-      boot.castShadow = true;
-
-      g.add(leg, boot);
-      kanshanRig.add(g);
-    });
-
-    // E) Chubby Cartoon Arms + Cute Plump Mitten Paws (Designed to HUG the snowman!)
-    const armY = -0.14;
-    const armZ = 0.02;
+    // E) Plump Teardrop Plushie Arms (Thinner at shoulder, fuller & rounder at paw — resting beside feet!)
+    const armY = -0.06;
+    const armZ = 0.04;
     const shoulderSurfX = findSurfaceX(armY, armZ);
 
-    const createCartoonArm = (side: number) => {
+    const createTeardropArm = (side: number) => {
       const pivot = new THREE.Group();
-      pivot.position.set(side * (shoulderSurfX - 0.045) * S, armY * S, armZ * S);
+      pivot.position.set(side * (shoulderSurfX - 0.035) * S, armY * S, armZ * S);
 
-      const curve = new THREE.CatmullRomCurve3([
+      // Build smooth teardrop-tapered plush arm using stacked spheres/capsules along curve
+      const armCurve = new THREE.CatmullRomCurve3([
         new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(side * 0.11, -0.17, 0.02),
-        new THREE.Vector3(side * 0.085, -0.36, 0.06),
+        new THREE.Vector3(side * 0.12, -0.22, 0.05),
+        new THREE.Vector3(side * 0.14, -0.46, 0.12),
       ]);
-      const armMesh = new THREE.Mesh(
-        new THREE.TubeGeometry(curve, 22, 0.056, 18, false),
-        limbCharcoalMat
-      );
+
+      // Tapered custom tube geometry (thicker toward the cute chubby paw!)
+      const tubularSegs = 24;
+      const radialSegs = 18;
+      const frames = armCurve.computeFrenetFrames(tubularSegs, false);
+      const pos: number[] = [];
+      const idx: number[] = [];
+
+      for (let i = 0; i <= tubularSegs; i++) {
+        const u = i / tubularSegs;
+        const p = armCurve.getPointAt(u);
+        const N = frames.normals[i];
+        const B = frames.binormals[i];
+        // Taper from 0.048 at shoulder -> 0.076 plump wrist!
+        const r = 0.048 + u * 0.028;
+        for (let j = 0; j <= radialSegs; j++) {
+          const v = (j / radialSegs) * Math.PI * 2;
+          const sin = Math.sin(v);
+          const cos = -Math.cos(v);
+          const vx = p.x + r * (cos * N.x + sin * B.x);
+          const vy = p.y + r * (cos * N.y + sin * B.y);
+          const vz = p.z + r * (cos * N.z + sin * B.z);
+          pos.push(vx, vy, vz);
+        }
+      }
+      for (let i = 0; i < tubularSegs; i++) {
+        for (let j = 0; j < radialSegs; j++) {
+          const a = i * (radialSegs + 1) + j;
+          const b = (i + 1) * (radialSegs + 1) + j;
+          const c = (i + 1) * (radialSegs + 1) + (j + 1);
+          const d = i * (radialSegs + 1) + (j + 1);
+          idx.push(a, b, d, b, c, d);
+        }
+      }
+      const taperedGeo = new THREE.BufferGeometry();
+      taperedGeo.setAttribute("position", new THREE.Float32BufferAttribute(pos, 3));
+      taperedGeo.setIndex(idx);
+      taperedGeo.computeVertexNormals();
+
+      const armMesh = new THREE.Mesh(taperedGeo, velvetSlateMat);
       armMesh.castShadow = true;
 
-      // Cute plump rounded paw + little thumb!
-      const pawGroup = new THREE.Group();
-      pawGroup.position.set(side * 0.085, -0.36, 0.06);
-      const mitten = new THREE.Mesh(new THREE.SphereGeometry(0.066, 18, 18), limbCharcoalMat);
-      mitten.scale.set(0.92, 1.15, 0.88);
-      const thumb = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.026, 0.045, 8, 12),
-        limbCharcoalMat
-      );
-      thumb.position.set(-side * 0.045, 0.01, 0.04);
-      thumb.rotation.z = side * 0.5;
-      thumb.rotation.x = -0.4;
+      // Plump rounded paw tip + cute little inner thumb nub!
+      const pawEnd = new THREE.Mesh(new THREE.SphereGeometry(0.076, 20, 20), velvetSlateMat);
+      pawEnd.scale.set(0.95, 1.08, 0.95);
+      pawEnd.position.set(side * 0.14, -0.46, 0.12);
+      pawEnd.castShadow = true;
 
-      pawGroup.add(mitten, thumb);
-      pivot.add(armMesh, pawGroup);
+      const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.034, 14, 14), velvetSlateMat);
+      thumb.scale.set(1.2, 0.85, 0.9);
+      thumb.position.set(side * 0.085, -0.44, 0.165);
+
+      pivot.add(armMesh, pawEnd, thumb);
       return pivot;
     };
-    const leftArm = createCartoonArm(-1);
-    const rightArm = createCartoonArm(1);
+
+    const leftArm = createTeardropArm(-1);
+    const rightArm = createTeardropArm(1);
     kanshanRig.add(leftArm, rightArm);
 
     // =========================================================
-    // 3. DETAILED CUTE SNOWMAN RIGHT IN KANSHAN'S PAWS!
+    // 3. THREE FLUFFY STACKED SNOWBALLS RIGHT BETWEEN SITTING FEET!
     // =========================================================
-    // Attached inside `kanshanRig` so when you rotate KanShan 360°, it rotates TOGETHER with KanShan's paws!
     const snowStack = new THREE.Group();
-    snowStack.position.set(0, -1.08, 0.62);
+    snowStack.position.set(0, -0.74, 0.72);
     const snowMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      roughness: 0.88,
+      roughness: 0.92,
       emissive: 0xf0f7ff,
       emissiveIntensity: 0.1,
     });
 
-    const sb1 = new THREE.Mesh(new THREE.SphereGeometry(0.22, 24, 24), snowMat);
-    sb1.scale.set(1.08, 0.92, 1.08);
-    sb1.position.set(0, 0.16, 0);
+    const sb1 = new THREE.Mesh(new THREE.SphereGeometry(0.21, 24, 24), snowMat);
+    sb1.scale.set(1.08, 0.9, 1.08);
+    sb1.position.set(0, 0.14, 0.12);
     sb1.castShadow = true;
     sb1.name = "snowman";
 
-    const sb2 = new THREE.Mesh(new THREE.SphereGeometry(0.175, 24, 24), snowMat);
-    sb2.scale.set(1.05, 0.94, 1.05);
-    sb2.position.set(0, 0.46, -0.02);
+    const sb2 = new THREE.Mesh(new THREE.SphereGeometry(0.18, 24, 24), snowMat);
+    sb2.scale.set(1.05, 0.92, 1.05);
+    sb2.position.set(0, 0.41, 0.04);
     sb2.castShadow = true;
     sb2.name = "snowman";
 
-    // Cute tiny coal buttons on middle snowball
-    const b1 = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 10), eyeBeadMat);
-    b1.position.set(0, 0.50, 0.15);
-    const b2 = b1.clone();
-    b2.position.set(0, 0.42, 0.155);
-
-    const sb3 = new THREE.Mesh(new THREE.SphereGeometry(0.145, 24, 24), snowMat);
-    sb3.position.set(0, 0.72, -0.04);
+    const sb3 = new THREE.Mesh(new THREE.SphereGeometry(0.155, 24, 24), snowMat);
+    sb3.position.set(0, 0.66, -0.02);
     sb3.castShadow = true;
     sb3.name = "snowman";
 
-    // Cute Snowman Face (Coal Eyes + Mini Carrot Nose!)
-    const smEyeL = new THREE.Mesh(new THREE.SphereGeometry(0.018, 10, 10), eyeBeadMat);
-    smEyeL.position.set(-0.048, 0.745, 0.095);
-    const smEyeR = smEyeL.clone();
-    smEyeR.position.x = 0.048;
-
-    const carrotNose = new THREE.Mesh(
-      new THREE.ConeGeometry(0.024, 0.09, 14),
-      new THREE.MeshStandardMaterial({ color: 0xf97316, roughness: 0.5 })
-    );
-    carrotNose.rotation.x = Math.PI / 2;
-    carrotNose.position.set(0, 0.72, 0.135);
-
-    snowStack.add(sb1, sb2, b1, b2, sb3, smEyeL, smEyeR, carrotNose);
+    snowStack.add(sb1, sb2, sb3);
     kanshanRig.add(snowStack);
 
     // =========================================================
     // 4. DESIGNER-TOY SCULPTED ACCESSORIES
     // =========================================================
-    const glassesGroup = buildDetailedGlasses(S, eyeY, eyeZ, eyeSurfX);
+    const glassesGroup = buildDetailedGlasses(S, eyeY);
     kanshanRig.add(glassesGroup);
 
     const scarfGroup = buildContouredKnittedScarf(S);
@@ -487,7 +487,7 @@ export default function KanShanStage3D({
     kanshanRig.add(muffsGroup);
 
     const fishGroup = buildCuteCodfish();
-    fishGroup.position.set(0.66, -0.56, 0.18);
+    fishGroup.position.set(0.76, -0.44, 0.28);
     fishGroup.rotation.z = -0.35;
     kanshanRig.add(fishGroup);
 
@@ -531,8 +531,8 @@ export default function KanShanStage3D({
       if (hit === "nose") {
         noseHoldTimer = setTimeout(() => {
           dragging = false;
-          springRef.current.sx = 1.04;
-          springRef.current.sy = 0.96;
+          springRef.current.sx = 1.05;
+          springRef.current.sy = 0.95;
           onTapNoseStart();
         }, 220);
       }
@@ -563,9 +563,10 @@ export default function KanShanStage3D({
         if (hit === "snowman") {
           onTapSnowman();
         } else if (hit === "head" || hit === "nose") {
-          springRef.current.sx = 1.07;
-          springRef.current.sy = 0.92;
-          springRef.current.jumpY = 0.11;
+          springRef.current.sx = 1.08;
+          springRef.current.sy = 0.91;
+          springRef.current.jumpY = 0.1;
+          springRef.current.waveTimer = 1.2; // Cute greeting wave when patted!
           onTapHead();
         }
       }
@@ -590,7 +591,8 @@ export default function KanShanStage3D({
 
     const animate = () => {
       raf = requestAnimationFrame(animate);
-      const t = clock.getElapsedTime();
+      const dt = Math.min(0.05, clock.getDelta());
+      const t = clock.elapsedTime;
       const curPet = petRef.current;
       const stacking = stackingRef.current;
       const bagMode = bagRef.current;
@@ -606,52 +608,62 @@ export default function KanShanStage3D({
       fishGroup.visible = eq.includes("codfish_plush") && !stacking;
       muffsGroup.visible = eq.includes("ear_muffs");
 
-      // Blink vs Happy Eyes
-      const isSmiling = stacking || curPet.mood === "happy";
+      const sp = springRef.current;
+      if (sp.waveTimer > 0) sp.waveTimer = Math.max(0, sp.waveTimer - dt);
+
+      // Blink vs Happy Crescent Eyes
+      const isSmiling = stacking || curPet.mood === "happy" || sp.waveTimer > 0;
       happyEyesGroup.visible = isSmiling;
       beadEyesGroup.visible = !isSmiling;
       if (!isSmiling) {
-        const blink = (t % 4.2) > 4.05;
-        leftEye.scale.y = blink ? 0.16 : 1.0;
-        rightEye.scale.y = blink ? 0.16 : 1.0;
+        const blink = (t % 3.8) > 3.64;
+        leftEye.scale.set(0.92, blink ? 0.15 : 1.18, 0.7);
+        rightEye.scale.set(0.92, blink ? 0.15 : 1.18, 0.7);
       }
 
-      // Arms Tween: Slide forward & curve inward so paws physically TOUCH & HUG the snowman!
-      const sp = springRef.current;
-      sp.armLerp += ((stacking ? 1 : 0) - sp.armLerp) * 0.12;
-      const idleX = (shoulderSurfX - 0.045) * S;
-      const hugX = 0.34 * S;
-      const curArmY = (armY - sp.armLerp * 0.12) * S;
+      // Arms Tween: Resting cutely beside sitting feet vs Hugging the top snowball (Image 2!)
+      sp.armLerp += ((stacking ? 1 : 0) - sp.armLerp) * 0.14;
+      const baseArmX = (shoulderSurfX - 0.035) * S;
+      const hugArmX = 0.38 * S;
+      const curArmY = (armY - sp.armLerp * 0.04) * S;
       const curArmZ = (armZ + sp.armLerp * 0.24) * S;
 
-      leftArm.position.set(-(idleX + (hugX - idleX) * sp.armLerp), curArmY, curArmZ);
-      rightArm.position.set(idleX + (hugX - idleX) * sp.armLerp, curArmY, curArmZ);
+      leftArm.position.set(-(baseArmX + (hugArmX - baseArmX) * sp.armLerp), curArmY, curArmZ);
+      rightArm.position.set(baseArmX + (hugArmX - baseArmX) * sp.armLerp, curArmY, curArmZ);
 
-      leftArm.rotation.x = -sp.armLerp * 1.05;
-      leftArm.rotation.y = sp.armLerp * 0.45;
-      leftArm.rotation.z = sp.armLerp * 0.48 + (1 - sp.armLerp) * Math.sin(t * 2) * 0.03;
+      leftArm.rotation.x = -sp.armLerp * 0.88;
+      leftArm.rotation.y = sp.armLerp * 0.42;
+      leftArm.rotation.z = sp.armLerp * 0.56 + (1 - sp.armLerp) * Math.sin(t * 1.8) * 0.025;
 
-      rightArm.rotation.x = -sp.armLerp * 1.05;
-      rightArm.rotation.y = -sp.armLerp * 0.45;
-      rightArm.rotation.z = -sp.armLerp * 0.48 - (1 - sp.armLerp) * Math.sin(t * 2) * 0.03;
+      // Cute right-hand wave when patted (`打招呼`)!
+      if (sp.waveTimer > 0 && sp.armLerp < 0.2) {
+        rightArm.rotation.z = -2.1 + Math.sin(t * 16) * 0.28;
+        rightArm.rotation.x = -0.3;
+      } else {
+        rightArm.rotation.x = -sp.armLerp * 0.88;
+        rightArm.rotation.y = -sp.armLerp * 0.42;
+        rightArm.rotation.z = -sp.armLerp * 0.56 - (1 - sp.armLerp) * Math.sin(t * 1.8) * 0.025;
+      }
 
       snowStack.visible = !bagMode && (stacking || sp.armLerp > 0.08);
-      const sScale = stacking ? 1.06 : 0.001;
-      snowStack.scale.lerp(new THREE.Vector3(sScale, sScale, sScale), 0.15);
+      const sScale = stacking ? 1.0 : 0.001;
+      snowStack.scale.lerp(new THREE.Vector3(sScale, sScale, sScale), 0.16);
 
-      const nScale = rec ? 0.94 : 1.0;
-      blackNoseMesh.scale.set(0.175 * S * nScale, 0.120 * S * nScale, 0.132 * S * nScale);
+      const nScale = rec ? 0.93 : 1.0;
+      blackNoseMesh.scale.set(0.165 * S * nScale, 0.145 * S * nScale, 0.132 * S * nScale);
 
-      // Breathing & Jelly Bounce
+      // Living Cozy Micro-Motion: Gentle slow side-to-side rock (`晃悠`) + soft breathing!
       sp.sx += (1 - sp.sx) * 0.14;
       sp.sy += (1 - sp.sy) * 0.14;
       sp.sz += (1 - sp.sz) * 0.14;
       sp.jumpY += (0 - sp.jumpY) * 0.14;
 
-      const breath = Math.sin(t * 2.2) * 0.01;
-      kanshanRig.scale.set(sp.sx - breath * 0.3, sp.sy + breath, sp.sz - breath * 0.3);
+      const breath = Math.sin(t * 2.1) * 0.012;
+      kanshanRig.scale.set(sp.sx - breath * 0.35, sp.sy + breath, sp.sz - breath * 0.35);
+      // Gentle adorable head/body tilt rock (`晃悠`)
+      kanshanRig.rotation.z = Math.sin(t * 1.35) * 0.022;
 
-      const baseY = bagMode ? 0.06 + Math.sin(t * 2) * 0.05 : -0.25;
+      const baseY = bagMode ? -0.18 + Math.sin(t * 2) * 0.05 : -0.58;
       charRoot.position.y = baseY + sp.jumpY;
       charRoot.rotation.y += (rotYRef.current - charRoot.rotation.y) * 0.12;
 
@@ -667,7 +679,6 @@ export default function KanShanStage3D({
       window.removeEventListener("pointerup", onUp);
       resizeObserver.disconnect();
       whiteBodyMesh.geometry.dispose();
-      blackNoseMesh.geometry.dispose();
       renderer.dispose();
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

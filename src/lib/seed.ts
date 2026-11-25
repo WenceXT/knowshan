@@ -113,7 +113,7 @@ export function createInitialStore(): KnowShanStore {
       level: 5,
       snowballProgress: 66,
       unlockedItems: ["thick_glasses", "zhihu_scarf", "camp_beanie"],
-      equippedItems: [], // Clean official bare Liu Kanshan silhouette by default!
+      equippedItems: ["thick_glasses"], // Signature continuous-brow nerd glasses on by default (removable in wardrobe!)
       lastSyncAt: "00:32 · 随身包挂已同步",
       statusMessage: "昨晚你说上台忘词的事，我帮你收好啦，点右边「堆雪」就能团成雪球寄出去",
     },
