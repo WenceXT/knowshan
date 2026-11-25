@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+:root {
+  --background: #bdd4f1;
+  --foreground: #4c3b2e;
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Fredoka", "Zen Maru Gothic", "PingFang SC", "Hiragino Maru Gothic ProN",
+    "YouYuan", "幼圆", "STYuanti-SC-Regular", sans-serif;
+  letter-spacing: 0.015em;
+  font-feature-settings: "tnum";
+  -webkit-font-smoothing: antialiased;
+  margin: 0;
+  padding: 0;
+}
+
+/* Soft custom scrollbar inside cozy sheets */
+::-webkit-scrollbar {
+  width: 4px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(148, 175, 209, 0.45);
+  border-radius: 999px;
+}
