@@ -206,20 +206,138 @@ export function buildSmoothSDFMesh(
 }
 
 export interface ArticulatedArm {
-  shoulder: THREE.Group;
-  elbow: THREE.Group;
-  wrist: THREE.Group;
+  root: THREE.Group;
+  shoulder: THREE.Bone;
+  elbow: THREE.Bone;
+  wrist: THREE.Bone;
 }
 
 export interface ArticulatedLeg {
-  hip: THREE.Group;
-  knee: THREE.Group;
-  ankle: THREE.Group;
+  root: THREE.Group;
+  hip: THREE.Bone;
+  knee: THREE.Bone;
+  ankle: THREE.Bone;
+}
+
+function clamp01(v: number): number {
+  return Math.max(0, Math.min(1, v));
+}
+
+function hermite01(t: number): number {
+  const c = clamp01(t);
+  return c * c * (3 - 2 * c);
 }
 
 /**
- * 2-Joint Articulated Charcoal Arm (Shoulder -> Elbow -> Wrist + 4-Fingered Hand)
- * Eliminates stiff straight-stick arms with natural A-frame hang & organic elbow/wrist follow-through!
+ * Builds a single, unbroken, watertight LatheGeometry tube (hemisphere top cap -> smooth cylinder -> tapered wrist/ankle)
+ * bound to a 3-Bone Skeleton (`bone0 -> bone1 -> bone2`) so elbows & knees bend like seamless silicone with ZERO joint seams!
+ */
+function buildSeamlessSkinnedLimbTube(
+  topCapRadius: number,
+  midRadius: number,
+  endRadius: number,
+  seg1Len: number,
+  seg2Len: number,
+  blendHalfWidth: number,
+  limbMat: THREE.Material
+): {
+  skinnedMesh: THREE.SkinnedMesh;
+  b0: THREE.Bone;
+  b1: THREE.Bone;
+  b2: THREE.Bone;
+} {
+  const b0 = new THREE.Bone();
+  const b1 = new THREE.Bone();
+  const b2 = new THREE.Bone();
+  b0.position.set(0, 0, 0);
+  b1.position.set(0, -seg1Len, 0);
+  b2.position.set(0, -seg2Len, 0);
+  b0.add(b1);
+  b1.add(b2);
+
+  const totalLen = seg1Len + seg2Len;
+  const profile: THREE.Vector2[] = [];
+
+  // IMPORTANT: Three.js LatheGeometry requires points ordered BOTTOM-TO-TOP (increasing Y)
+  // so triangle winding faces OUTWARD!
+  const botSteps = 5;
+  for (let i = botSteps; i >= 1; i--) {
+    const ang = (i / botSteps) * (Math.PI * 0.5);
+    const r = Math.cos(ang) * endRadius;
+    const y = -totalLen - Math.sin(ang) * endRadius * 0.65;
+    profile.push(new THREE.Vector2(i === botSteps ? 0.0001 : r, y));
+  }
+
+  // Smooth high-density shaft from -totalLen UP to 0 (28 rings for buttery elbow/knee bend!)
+  const shaftSteps = 28;
+  for (let i = shaftSteps; i >= 0; i--) {
+    const u = i / shaftSteps; // 1 at bottom (-totalLen), 0 at top (0)
+    const y = -u * totalLen;
+    const r =
+      u < 0.5
+        ? topCapRadius + (midRadius - topCapRadius) * (u * 2)
+        : midRadius + (endRadius - midRadius) * ((u - 0.5) * 2);
+    profile.push(new THREE.Vector2(r, y));
+  }
+
+  // Smooth hemispherical top shoulder/hip cap from y = 0 UP to +topCapRadius
+  const capSteps = 8;
+  for (let i = capSteps - 1; i >= 0; i--) {
+    const ang = (i / capSteps) * (Math.PI * 0.5); // PI/2 = equator, 0 = top pole
+    const r = Math.sin(ang) * topCapRadius;
+    const y = Math.cos(ang) * topCapRadius;
+    profile.push(new THREE.Vector2(i === 0 ? 0.0001 : r, y));
+  }
+
+  const geo = new THREE.LatheGeometry(profile, 22);
+  const pos = geo.getAttribute("position");
+  const vCount = pos.count;
+
+  const skinIndices = new Uint16Array(vCount * 4);
+  const skinWeights = new Float32Array(vCount * 4);
+
+  for (let i = 0; i < vCount; i++) {
+    const vy = pos.getY(i);
+    // Smoothly blend Bone 0 -> Bone 1 across the middle joint (y = -seg1Len)
+    const tJoint1 = hermite01((-seg1Len + blendHalfWidth - vy) / (blendHalfWidth * 2));
+    // Smoothly blend Bone 1 -> Bone 2 near the end joint (y = -totalLen)
+    const endBlend = blendHalfWidth * 0.65;
+    const tJoint2 = hermite01((-totalLen + endBlend - vy) / (endBlend * 2));
+
+    const w0 = 1 - tJoint1;
+    const w1 = tJoint1 * (1 - tJoint2);
+    const w2 = tJoint1 * tJoint2;
+
+    const i4 = i * 4;
+    skinIndices[i4] = 0;
+    skinIndices[i4 + 1] = 1;
+    skinIndices[i4 + 2] = 2;
+    skinIndices[i4 + 3] = 0;
+
+    skinWeights[i4] = w0;
+    skinWeights[i4 + 1] = w1;
+    skinWeights[i4 + 2] = w2;
+    skinWeights[i4 + 3] = 0;
+  }
+
+  geo.setAttribute("skinIndex", new THREE.Uint16BufferAttribute(skinIndices, 4));
+  geo.setAttribute("skinWeight", new THREE.Float32BufferAttribute(skinWeights, 4));
+
+  const skinnedMesh = new THREE.SkinnedMesh(geo, limbMat);
+  skinnedMesh.castShadow = true;
+  skinnedMesh.receiveShadow = true;
+  skinnedMesh.frustumCulled = false;
+
+  const skeleton = new THREE.Skeleton([b0, b1, b2]);
+  skinnedMesh.add(b0);
+  skinnedMesh.updateMatrixWorld(true);
+  skinnedMesh.bind(skeleton);
+
+  return { skinnedMesh, b0, b1, b2 };
+}
+
+/**
+ * Seamless 1-Piece SkinnedMesh Charcoal Arm + Cute 4-Fingered Hand (ZERO segmented capsule seam!)
  */
 export function buildFourFingeredArm(
   side: number,
@@ -230,123 +348,81 @@ export function buildFourFingeredArm(
   const armZ = -0.005;
   const shoulderSurfX = findSurfaceX(armY, armZ);
 
-  const shoulder = new THREE.Group();
-  shoulder.position.set(side * (shoulderSurfX - 0.030) * S, armY * S, armZ * S);
+  const root = new THREE.Group();
+  // Positioned right on the outer shoulder contour (like Photo 3!) so the upper arm hangs cleanly outside the pear belly!
+  root.position.set(side * (shoulderSurfX + 0.005) * S, armY * S, armZ * S);
 
-  const shoulderCap = new THREE.Mesh(new THREE.SphereGeometry(0.042 * S, 16, 16), limbMat);
-  shoulder.add(shoulderCap);
-
-  // Upper arm segment (shoulder -> elbow)
-  const upperLen = 0.155 * S;
-  const upperArm = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.037 * S, upperLen, 10, 16),
+  const { skinnedMesh, b0: shoulder, b1: elbow, b2: wrist } = buildSeamlessSkinnedLimbTube(
+    0.040 * S,
+    0.037 * S,
+    0.034 * S,
+    0.155 * S,
+    0.148 * S,
+    0.055 * S,
     limbMat
   );
-  upperArm.position.set(side * 0.018 * S, -upperLen * 0.52, 0.006 * S);
-  upperArm.rotation.z = side * 0.11;
-  upperArm.castShadow = true;
-  shoulder.add(upperArm);
+  root.add(skinnedMesh);
 
-  // Elbow joint pivot
-  const elbow = new THREE.Group();
-  elbow.position.set(side * 0.034 * S, -upperLen * 1.02, 0.012 * S);
-  shoulder.add(elbow);
-
-  const forearmLen = 0.145 * S;
-  const forearm = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.035 * S, forearmLen, 10, 16),
-    limbMat
-  );
-  forearm.position.set(side * 0.008 * S, -forearmLen * 0.5, 0.012 * S);
-  forearm.rotation.x = 0.08;
-  forearm.castShadow = true;
-  elbow.add(forearm);
-
-  // Wrist + 4-Fingered Mitten Hand
-  const wrist = new THREE.Group();
-  wrist.position.set(side * 0.014 * S, -forearmLen * 1.02, 0.022 * S);
-  elbow.add(wrist);
-
-  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.050 * S, 18, 16), limbMat);
-  palm.scale.set(0.78, 1.05, 0.96);
+  // Seamless 4-Fingered Mitten Hand attached to wrist bone
+  const palm = new THREE.Mesh(new THREE.SphereGeometry(0.048 * S, 18, 16), limbMat);
+  palm.scale.set(0.78, 1.06, 0.96);
+  palm.position.set(0, -0.018 * S, 0.006 * S);
   palm.castShadow = true;
   wrist.add(palm);
 
   const thumb = new THREE.Mesh(
-    new THREE.CapsuleGeometry(0.0165 * S, 0.030 * S, 8, 12),
+    new THREE.CapsuleGeometry(0.016 * S, 0.030 * S, 8, 12),
     limbMat
   );
-  thumb.position.set(-side * 0.012 * S, -0.008 * S, 0.046 * S);
+  thumb.position.set(-side * 0.010 * S, -0.018 * S, 0.048 * S);
   thumb.rotation.x = Math.PI * 0.34;
-  thumb.rotation.z = side * 0.25;
+  thumb.rotation.z = side * 0.22;
   wrist.add(thumb);
 
   [-0.24, 0, 0.24].forEach((fan, idx) => {
-    const len = idx === 1 ? 0.040 * S : 0.034 * S;
+    const len = idx === 1 ? 0.038 * S : 0.032 * S;
     const finger = new THREE.Mesh(
-      new THREE.CapsuleGeometry(0.016 * S, len, 8, 12),
+      new THREE.CapsuleGeometry(0.0155 * S, len, 8, 12),
       limbMat
     );
     finger.position.set(
-      side * 0.004 * S,
-      (-0.046 - (idx === 1 ? 0.004 : 0)) * S,
-      (-fan * 0.092 + 0.006) * S
+      side * 0.003 * S,
+      (-0.058 - (idx === 1 ? 0.004 : 0)) * S,
+      (-fan * 0.088 + 0.008) * S
     );
-    finger.rotation.x = -fan * 0.55 + 0.12;
+    finger.rotation.x = -fan * 0.52 + 0.10;
     finger.castShadow = true;
     wrist.add(finger);
   });
 
-  return { shoulder, elbow, wrist };
+  return { root, shoulder, elbow, wrist };
 }
 
 /**
- * 2-Joint Articulated Standing Leg (Hip -> Knee -> Ankle + Plump Boot, Sole at local y = -0.34 * S)
- * Supports supple knee-bend cushioned breathing, weight shifts, and natural stepping!
+ * Seamless 1-Piece SkinnedMesh Standing Leg + Plump Rounded Boot (ZERO knee joint seam!)
  */
 export function buildStandingLeg(
   side: number,
   S: number,
   limbMat: THREE.Material
 ): ArticulatedLeg {
-  const hip = new THREE.Group();
-  hip.position.set(side * 0.145 * S, -0.455 * S, -0.005 * S);
+  const root = new THREE.Group();
+  root.position.set(side * 0.145 * S, -0.455 * S, -0.005 * S);
 
-  const hipCap = new THREE.Mesh(new THREE.SphereGeometry(0.058 * S, 16, 16), limbMat);
-  hip.add(hipCap);
-
-  // Thigh segment
-  const thighLen = 0.135 * S;
-  const thigh = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.055 * S, 0.057 * S, thighLen, 20),
+  const { skinnedMesh, b0: hip, b1: knee, b2: ankle } = buildSeamlessSkinnedLimbTube(
+    0.056 * S,
+    0.057 * S,
+    0.059 * S,
+    0.138 * S,
+    0.138 * S,
+    0.050 * S,
     limbMat
   );
-  thigh.position.y = -thighLen * 0.5;
-  thigh.castShadow = true;
-  hip.add(thigh);
+  root.add(skinnedMesh);
 
-  // Knee joint pivot
-  const knee = new THREE.Group();
-  knee.position.y = -thighLen;
-  hip.add(knee);
-
-  const kneeCap = new THREE.Mesh(new THREE.SphereGeometry(0.055 * S, 14, 14), limbMat);
-  knee.add(kneeCap);
-
-  // Shin segment
-  const shinLen = 0.135 * S;
-  const shin = new THREE.Mesh(
-    new THREE.CylinderGeometry(0.056 * S, 0.060 * S, shinLen, 20),
-    limbMat
-  );
-  shin.position.y = -shinLen * 0.5;
-  shin.castShadow = true;
-  knee.add(shin);
-
-  // Ankle + Rounded Boot (sole strictly at -0.34 * S when straight!)
-  const ankle = new THREE.Group();
-  ankle.position.set(0, -shinLen - 0.015 * S, 0.042 * S);
-  knee.add(ankle);
+  const bootHolder = new THREE.Group();
+  bootHolder.position.set(0, -0.008 * S, 0.042 * S);
+  ankle.add(bootHolder);
 
   const bootMain = new THREE.Mesh(
     new THREE.CapsuleGeometry(0.056 * S, 0.078 * S, 14, 20),
@@ -356,14 +432,14 @@ export function buildStandingLeg(
   bootMain.scale.set(1.12, 1.0, 0.96);
   bootMain.castShadow = true;
   bootMain.receiveShadow = true;
-  ankle.add(bootMain);
+  bootHolder.add(bootMain);
 
   const heel = new THREE.Mesh(new THREE.SphereGeometry(0.058 * S, 16, 14), limbMat);
   heel.scale.set(1.04, 0.92, 1.0);
   heel.position.set(0, 0.004 * S, -0.036 * S);
-  ankle.add(heel);
+  bootHolder.add(heel);
 
-  return { hip, knee, ankle };
+  return { root, hip, knee, ankle };
 }
 
 /**

@@ -33,9 +33,9 @@ interface KanShanStage3DProps {
 // Grounded surface heights: white paw rug top = -1.276, sofa cushion top = -0.738
 // Kept cleanly away from standing Kanshan's boots so both boots & contact shadows show!
 const TREASURE_SPOTS: [number, number, number][] = [
-  [0.24, -1.274, 0.96], // Front foreground rug (cleanly between boots, snowball & right fish!)
-  [0.64, -1.274, 0.66], // Right-front rug
-  [-0.64, -0.738, -1.20], // Inner sofa cushion top (cleanly right of 2D button!)
+  [0.36, -1.274, 1.04], // Front foreground rug (generously clear of boots from any angle!)
+  [0.68, -1.274, 0.60], // Right-front rug
+  [-0.64, -0.738, -1.20], // Inner sofa cushion top
 ];
 
 function smoothstep(edge0: number, edge1: number, x: number): number {
@@ -566,14 +566,14 @@ export default function KanShanStage3D({
     happyEyesGroup.visible = false;
     headBone.add(happyEyesGroup);
 
-    // 2-Joint Articulated Arms & Standing Legs!
+    // Seamless 1-Piece SkinnedMesh Arms & Standing Legs!
     const leftArm = buildFourFingeredArm(-1, S, charcoalLimbMat);
     const rightArm = buildFourFingeredArm(1, S, charcoalLimbMat);
-    kanshanRig.add(leftArm.shoulder, rightArm.shoulder);
+    kanshanRig.add(leftArm.root, rightArm.root);
 
     const leftLeg = buildStandingLeg(-1, S, charcoalLimbMat);
     const rightLeg = buildStandingLeg(1, S, charcoalLimbMat);
-    kanshanRig.add(leftLeg.hip, rightLeg.hip);
+    kanshanRig.add(leftLeg.root, rightLeg.root);
 
     // =========================================================
     // 4. FITTED OPTIONAL ACCESSORIES
@@ -964,7 +964,7 @@ export default function KanShanStage3D({
           restWeight * (-0.06 + grooveSwing) + sp.armLerp * patShX + sp.waveLerp * waveShX;
         leftArm.shoulder.rotation.y = sp.waveLerp * 0.18;
         leftArm.shoulder.rotation.z =
-          restWeight * (-0.16 - breatheSwing * 0.025) +
+          restWeight * (-0.21 - breatheSwing * 0.025) +
           sp.armLerp * patShZ +
           sp.waveLerp * waveShZ;
 
@@ -973,15 +973,15 @@ export default function KanShanStage3D({
         leftArm.elbow.rotation.z = sp.waveLerp * waveElZ;
 
         leftArm.wrist.rotation.x = sp.armLerp * patWrX;
-        leftArm.wrist.rotation.z = restWeight * 0.08 + sp.waveLerp * waveWrZ;
+        leftArm.wrist.rotation.z = restWeight * 0.10 + sp.waveLerp * waveWrZ;
 
         // Right arm: natural relaxed A-frame + opposite groove swing with elbow lag!
         rightArm.shoulder.rotation.x = -0.06 - grooveSwing;
         rightArm.shoulder.rotation.y = 0;
-        rightArm.shoulder.rotation.z = 0.16 + breatheSwing * 0.025;
+        rightArm.shoulder.rotation.z = 0.21 + breatheSwing * 0.025;
         rightArm.elbow.rotation.x = -0.26 - grooveLag;
         rightArm.elbow.rotation.z = 0;
-        rightArm.wrist.rotation.set(0, 0, -0.08);
+        rightArm.wrist.rotation.set(0, 0, -0.10);
       }
 
       // ---------------------------------------------------------
