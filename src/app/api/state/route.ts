@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { readStore, resetStoreToStoryline, writeStore } from "@/lib/store";
-import { ACCESSORIES } from "@/lib/seed";
+import { ACCESSORIES, ALL_HOARD_TREASURES } from "@/lib/seed";
 import { computePersonaMirror } from "@/lib/ai-engine";
 import { PetMood } from "@/types/knowshan";
 
@@ -103,6 +103,19 @@ export async function POST(req: Request) {
 
   if (body.action === "select_question") {
     store.activeQuestionId = body.questionId;
+    writeStore(store);
+    return NextResponse.json({ store });
+  }
+
+  if (body.action === "refresh_hoard") {
+    const firstId = store.hoardedItems[0]?.id;
+    const curIdx = ALL_HOARD_TREASURES.findIndex((t) => t.id === firstId);
+    const nextStart = curIdx < 0 ? 0 : (curIdx + 3) % ALL_HOARD_TREASURES.length;
+    store.hoardedItems = ALL_HOARD_TREASURES.slice(nextStart, nextStart + 3);
+    store.pet.mood = "happy";
+    store.pet.exp += 10;
+    store.pet.level = Math.floor(store.pet.exp / 120) + 1;
+    store.pet.statusMessage = "刚从知乎雪原逛回来，给你叼了三件闪闪发光的新宝贝放地上啦";
     writeStore(store);
     return NextResponse.json({ store });
   }

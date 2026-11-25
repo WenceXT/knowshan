@@ -52,6 +52,7 @@ export async function analyzeWhisperText(
   let structuredSummary = "小看山把你刚才叹的这口气，轻轻折好收进口袋里啦。";
   let corePainPoint = "其实你已经做得很好了，不用事事都逼自己拿满分。";
   let hiddenValue = "外面正好也有人睡不着在聊这件事，你的经历也许能帮人松一口气。";
+  let bubbleQuestion = "刚经历完这件堵在心里的小事，现在回头看你最想对自己说什么？";
 
   if (/pre|演讲|汇报|上台|忘词|搞砸|答辩|紧张|社死/i.test(text)) {
     emotionTag = "有点委屈";
@@ -59,16 +60,39 @@ export async function analyzeWhisperText(
     structuredSummary = "上台太紧张脑子断片了，下台后还在一个人生自己的闷气。";
     corePainPoint = "越在乎就越容易发抖，真的一点都不丢人呀。";
     hiddenValue = "好多第一次上台的人也在手心冒汗，你的复盘能悄悄接住他们。";
+    bubbleQuestion = "上台汇报紧张到忘词搞砸了，后来是怎么走出来的？";
+  } else if (/备忘录|删|不敢发|朋友圈|熟人/i.test(text)) {
+    emotionTag = "欲言又止";
+    emotionColor = "#60a5fa";
+    structuredSummary = "心里攒了好多真话，却在点发送前又悄悄退了回来。";
+    corePainPoint = "不想被熟人围观很正常，你的感受本身就很有分量。";
+    hiddenValue = "知乎上有近两万人也在聊那种写完又删掉的心情。";
+    bubbleQuestion = "为什么我们总习惯把心事写进备忘录，到了发布框前又默默删掉？";
+  } else if (/面试|秋招|春招|实习|offer|工作/i.test(text)) {
+    emotionTag = "有点紧绷";
+    emotionColor = "#38bdf8";
+    structuredSummary = "面对未知的考察已经拼尽全力了，下场后先抱抱紧绷的自己。";
+    corePainPoint = "一次卡壳定义不了你的本事，只是还没遇到同频的考官。";
+    hiddenValue = "好多正在找工作的同龄人也在等一盏灯，你的经历能陪陪他们。";
+    bubbleQuestion = "面试或汇报突然被问懵了是种什么体验？后来怎么缓过来的？";
+  } else if (/考试|挂科|考研|论文|毕设|实验/i.test(text)) {
+    emotionTag = "压力山大";
+    emotionColor = "#f59e0b";
+    structuredSummary = "对着进度条一个人死磕了这么久，真的辛苦啦。";
+    corePainPoint = "慢一点也没关系，一步一步挪过去就已经很棒了。";
+    hiddenValue = "同样在赶ddl和磨论文的人，最懂你此刻的叹气。";
+    bubbleQuestion = "赶论文或备考快撑不住的深夜，是什么小事把你拉回来的？";
   } else if (/熬夜|凌晨|失眠|睡不着|累|孤独|一个人|租房|独居/i.test(text)) {
     emotionTag = "夜里犯困";
     emotionColor = "#8b5cf6";
     structuredSummary = "忙完安静下来突然觉得空落落的，只想找个角落待一会儿。";
     corePainPoint = "白天撑得太用力了，晚上允许自己当一只蔫掉的小狐狸吧。";
     hiddenValue = "这份深夜的小切片很温柔，好多夜猫子刷到都会想给你点个赞。";
+    bubbleQuestion = "熬到深夜还舍不得睡的时候，都有哪些只有自己懂的瞬间？";
   }
 
   const llmReply = await callOptionalLLM(
-    `你是一只住在主人桌角和包挂上的小北极狐「小看山」（主人性格：${persona.mbti}）。说话要完全没有AI味，不能用任何心理学大词、不能说教、不能分点列举！用软乎乎、嘴硬心软的老朋友口吻返回JSON：{"emotionTag":"4字内心情小贴纸","structuredSummary":"30字内像小动物记日记一样的暖心话","hiddenValue":"30字内轻轻提一句也有人在聊这个"}`,
+    `你是一只住在主人冰屋里的小北极狐「小看山」（主人性格：${persona.mbti}）。说话要完全没有AI味，不能说教！根据主人刚倾诉的经历，提炼一个像知乎高共鸣提问一样的疑问句（必须以问号结尾，16到26个字，紧扣主人的具体经历）。返回JSON：{"emotionTag":"4字内心情小贴纸","structuredSummary":"30字内像小动物记日记一样的暖心话","hiddenValue":"30字内轻轻提一句也有人在聊这个","bubbleQuestion":"紧扣主人经历的话题疑问句？"}`,
     text
   );
 
@@ -78,6 +102,7 @@ export async function analyzeWhisperText(
       if (parsed.emotionTag) emotionTag = parsed.emotionTag;
       if (parsed.structuredSummary) structuredSummary = parsed.structuredSummary;
       if (parsed.hiddenValue) hiddenValue = parsed.hiddenValue;
+      if (parsed.bubbleQuestion) bubbleQuestion = parsed.bubbleQuestion;
     } catch {
       // Keep warm default
     }
@@ -97,6 +122,7 @@ export async function analyzeWhisperText(
     structuredSummary,
     corePainPoint,
     hiddenValue,
+    bubbleQuestion,
     matchedQuestionIds: matched.length ? matched : ["q-pre-nervous"],
   };
 }

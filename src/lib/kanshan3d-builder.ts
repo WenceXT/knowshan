@@ -628,3 +628,192 @@ export function buildCuteCodfish(): THREE.Group {
   g.add(body, belly, tailTop, tailBot, eyeL, eyeR);
   return g;
 }
+
+/**
+ * Radial Soft Glow Texture for Sparkling Room Treasures!
+ */
+let cachedGlowTex: THREE.CanvasTexture | null = null;
+function getTreasureGlowTexture(): THREE.CanvasTexture {
+  if (cachedGlowTex) return cachedGlowTex;
+  const c = document.createElement("canvas");
+  c.width = 128;
+  c.height = 128;
+  const ctx = c.getContext("2d")!;
+  const grad = ctx.createRadialGradient(64, 64, 4, 64, 64, 62);
+  grad.addColorStop(0, "rgba(255, 248, 196, 0.95)");
+  grad.addColorStop(0.38, "rgba(253, 224, 71, 0.52)");
+  grad.addColorStop(0.72, "rgba(125, 211, 252, 0.22)");
+  grad.addColorStop(1, "rgba(255, 255, 255, 0)");
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, 128, 128);
+  cachedGlowTex = new THREE.CanvasTexture(c);
+  cachedGlowTex.colorSpace = THREE.SRGBColorSpace;
+  return cachedGlowTex;
+}
+
+function createStarSparkleGeometry(radius = 0.055): THREE.ShapeGeometry {
+  const s = new THREE.Shape();
+  const inner = radius * 0.24;
+  for (let i = 0; i < 8; i++) {
+    const a = (i / 8) * Math.PI * 2;
+    const r = i % 2 === 0 ? radius : inner;
+    const x = Math.cos(a) * r;
+    const y = Math.sin(a) * r;
+    if (i === 0) s.moveTo(x, y);
+    else s.lineTo(x, y);
+  }
+  s.closePath();
+  return new THREE.ShapeGeometry(s);
+}
+
+/**
+ * Builds an Eye-Catching Sparkling 3D Room Treasure Pod (Glow Halo + 3D Prop + Twinkling Stars + Hit Sphere)!
+ */
+export function buildSparklingRoomTreasure(kind: string, slotIndex: number): {
+  root: THREE.Group;
+  propGroup: THREE.Group;
+  haloMesh: THREE.Mesh;
+  stars: THREE.Mesh[];
+  hitMesh: THREE.Mesh;
+} {
+  const root = new THREE.Group();
+  const propGroup = new THREE.Group();
+  root.add(propGroup);
+
+  // 1. Soft Shimmering Floor Halo + Upright Aura Sprite
+  const haloMat = new THREE.MeshBasicMaterial({
+    map: getTreasureGlowTexture(),
+    transparent: true,
+    opacity: 0.85,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  });
+  const haloMesh = new THREE.Mesh(new THREE.PlaneGeometry(0.68, 0.68), haloMat);
+  haloMesh.rotation.x = -Math.PI / 2;
+  haloMesh.position.y = 0.02;
+  root.add(haloMesh);
+
+  const backAura = new THREE.Mesh(
+    new THREE.PlaneGeometry(0.58, 0.58),
+    new THREE.MeshBasicMaterial({
+      map: getTreasureGlowTexture(),
+      transparent: true,
+      opacity: 0.55,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+    })
+  );
+  backAura.position.set(0, 0.20, -0.04);
+  root.add(backAura);
+
+  // 2. Sculpted Cute 3D Treasure Prop
+  const goldMat = new THREE.MeshStandardMaterial({
+    color: 0xfde047,
+    emissive: 0xf59e0b,
+    emissiveIntensity: 0.32,
+    roughness: 0.35,
+  });
+  const creamMat = new THREE.MeshStandardMaterial({
+    color: 0xfffbeb,
+    emissive: 0xfef3c7,
+    emissiveIntensity: 0.22,
+    roughness: 0.5,
+  });
+  const coralMat = new THREE.MeshStandardMaterial({
+    color: 0xfb7185,
+    emissive: 0xf43f5e,
+    emissiveIntensity: 0.2,
+    roughness: 0.4,
+  });
+  const skyGlowMat = new THREE.MeshStandardMaterial({
+    color: 0x7dd3fc,
+    emissive: 0x38bdf8,
+    emissiveIntensity: 0.3,
+    roughness: 0.25,
+  });
+
+  if (kind === "fish") {
+    const fish = buildCuteCodfish();
+    fish.scale.setScalar(1.15);
+    fish.rotation.y = -0.3;
+    fish.rotation.z = 0.18;
+    propGroup.add(fish);
+  } else if (kind === "card" || kind === "plane") {
+    // Warm glowing letter card with cute coral wax seal!
+    const card = new THREE.Mesh(new THREE.BoxGeometry(0.28, 0.20, 0.026), creamMat);
+    card.rotation.z = 0.14;
+    card.rotation.x = -0.25;
+    const seal = new THREE.Mesh(new THREE.CylinderGeometry(0.038, 0.038, 0.032, 16), coralMat);
+    seal.rotation.x = Math.PI / 2 - 0.25;
+    seal.position.set(0, 0, 0.012);
+    propGroup.add(card, seal);
+  } else if (kind === "cocoa") {
+    const mug = new THREE.Mesh(new THREE.CylinderGeometry(0.11, 0.095, 0.20, 20), coralMat);
+    const foam = new THREE.Mesh(new THREE.SphereGeometry(0.098, 16, 12), creamMat);
+    foam.scale.set(1, 0.4, 1);
+    foam.position.y = 0.09;
+    propGroup.add(mug, foam);
+  } else if (kind === "shell" || kind === "acorn") {
+    const pearl = new THREE.Mesh(new THREE.SphereGeometry(0.13, 20, 16), goldMat);
+    pearl.scale.set(1.15, 0.85, 0.9);
+    const cap = new THREE.Mesh(
+      new THREE.SphereGeometry(0.135, 18, 12, 0, Math.PI * 2, 0, Math.PI * 0.48),
+      coralMat
+    );
+    cap.position.y = 0.02;
+    propGroup.add(pearl, cap);
+  } else {
+    // Glowing Aurora Star Jar / Crystal / Golden Bell
+    const jarGlass = new THREE.Mesh(
+      new THREE.CylinderGeometry(0.11, 0.125, 0.23, 20),
+      new THREE.MeshStandardMaterial({
+        color: 0xe0f2fe,
+        transparent: true,
+        opacity: 0.58,
+        roughness: 0.12,
+      })
+    );
+    const innerStar = new THREE.Mesh(new THREE.OctahedronGeometry(0.075, 0), goldMat);
+    const cork = new THREE.Mesh(new THREE.CylinderGeometry(0.085, 0.09, 0.045, 16), coralMat);
+    cork.position.y = 0.125;
+    const glowCore = new THREE.Mesh(new THREE.SphereGeometry(0.055, 14, 14), skyGlowMat);
+    glowCore.position.y = -0.02;
+    propGroup.add(jarGlass, innerStar, cork, glowCore);
+  }
+  propGroup.position.y = 0.21;
+
+  // 3. Three Twinkling 4-Point Diamond Sparkles around the prop!
+  const starGeo = createStarSparkleGeometry(0.052);
+  const starMatWhite = new THREE.MeshBasicMaterial({
+    color: 0xffffff,
+    side: THREE.DoubleSide,
+  });
+  const starMatGold = new THREE.MeshBasicMaterial({
+    color: 0xfef08a,
+    side: THREE.DoubleSide,
+  });
+
+  const stars: THREE.Mesh[] = [];
+  const starOffsets = [
+    { x: -0.18, y: 0.36, z: 0.08 },
+    { x: 0.19, y: 0.28, z: 0.10 },
+    { x: 0.03, y: 0.44, z: 0.06 },
+  ];
+  starOffsets.forEach((so, idx) => {
+    const st = new THREE.Mesh(starGeo, idx % 2 === 0 ? starMatGold : starMatWhite);
+    st.position.set(so.x, so.y, so.z);
+    root.add(st);
+    stars.push(st);
+  });
+
+  // 4. Generous Invisible Raycast Sphere (`hoard_0`, `hoard_1`, `hoard_2`)
+  const hitMesh = new THREE.Mesh(
+    new THREE.SphereGeometry(0.32, 12, 12),
+    new THREE.MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false })
+  );
+  hitMesh.position.y = 0.22;
+  hitMesh.name = `hoard_${slotIndex}`;
+  root.add(hitMesh);
+
+  return { root, propGroup, haloMesh, stars, hitMesh };
+}

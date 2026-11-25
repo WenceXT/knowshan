@@ -22,7 +22,7 @@ export async function POST(req: Request) {
         {
           id: `m-${Date.now()}`,
           role: "kanshan",
-          content: `刚才听你说完「${entry.emotionTag}」，我悄悄在知乎上帮你找到了一个超同频的问题：《${q.title}》（${q.followers.toLocaleString()} 人关注）。不用有写作压力，我们先随便聊聊：回想刚才那件事，最让你感触深的一个小细节是什么？`,
+          content: `刚听你念叨完，我发现外面有 ${q.topic}这个话题：「${entry.bubbleQuestion || q.bubblePrompt || q.title}」——回想刚才那幕，最戳中你的一个小细节是什么呀？`,
           createdAt: entry.createdAt.replace("今天 ", ""),
         },
       ];
@@ -33,8 +33,8 @@ export async function POST(req: Request) {
   store.pet.level = Math.floor(store.pet.exp / 120) + 1;
   store.pet.snowballProgress = Math.min(100, store.pet.snowballProgress + 35);
   store.pet.mood = "happy";
-  store.pet.lastSyncAt = `${entry.createdAt.replace("今天 ", "")} · 包挂语音已同步至网页端`;
-  store.pet.statusMessage = `已将你的语音整理为「${entry.emotionTag}」卡片，雪球长大 35%，还匹配到了同频知乎问题！`;
+  store.pet.lastSyncAt = `${entry.createdAt.replace("今天 ", "")} · 悄悄话已收进小窝`;
+  store.pet.statusMessage = entry.bubbleQuestion || "给你吐了一个同频话题气泡，点开聊聊吧";
 
   writeStore(store);
   return NextResponse.json({ store, entry });

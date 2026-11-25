@@ -2,7 +2,7 @@
 
 import React, { useEffect, useRef } from "react";
 import * as THREE from "three";
-import { PetState } from "@/types/knowshan";
+import { HoardedItem, PetState } from "@/types/knowshan";
 import {
   buildContouredKnittedScarf,
   buildCuteCodfish,
@@ -10,6 +10,7 @@ import {
   buildKnittedBeanie,
   buildPlushEarmuffs,
   buildSmoothSDFMesh,
+  buildSparklingRoomTreasure,
   evalCartoonKanshanSDF,
   findFaceSurfaceZ,
   findSurfaceX,
@@ -17,13 +18,14 @@ import {
 
 interface KanShanStage3DProps {
   pet: PetState;
-  isStackingSnow: boolean;
-  isBagCharmMode: boolean;
+  hoardedItems: HoardedItem[];
+  isHuntingTreasure: boolean;
   isRecordingNose: boolean;
   onTapHead: () => void;
   onTapNoseStart: () => void;
   onTapNoseEnd: () => void;
   onTapSnowman: () => void;
+  onSelectHoardItem: (item: HoardedItem) => void;
 }
 
 function smin(a: number, b: number, k: number): number {
@@ -43,21 +45,30 @@ function sdSphere(
   return Math.hypot(px - cx, py - cy, pz - cz) - r;
 }
 
+const TREASURE_SPOTS: [number, number, number][] = [
+  [0.08, -1.31, 1.02], // Front-edge of paw rug (cleanly below Kanshan's feet!)
+  [0.58, -1.27, 0.72], // Right-front paw rug (cleanly below 2-button dock!)
+  [-0.78, -0.90, -1.08], // Inner shell sofa cushion (centered between 2D button & glasses!)
+];
+
 export default function KanShanStage3D({
   pet,
-  isStackingSnow,
-  isBagCharmMode,
+  hoardedItems,
+  isHuntingTreasure,
   isRecordingNose,
   onTapHead,
   onTapNoseStart,
   onTapNoseEnd,
   onTapSnowman,
+  onSelectHoardItem,
 }: KanShanStage3DProps) {
   const mountRef = useRef<HTMLDivElement | null>(null);
   const petRef = useRef(pet);
-  const stackingRef = useRef(isStackingSnow);
-  const bagRef = useRef(isBagCharmMode);
+  const hoardRef = useRef(hoardedItems);
+  const huntingRef = useRef(isHuntingTreasure);
   const recRef = useRef(isRecordingNose);
+  const onSelectHoardRef = useRef(onSelectHoardItem);
+
   const springRef = useRef({
     sx: 1,
     sy: 1,
@@ -65,8 +76,15 @@ export default function KanShanStage3D({
     jumpY: 0,
     armLerp: 0,
     waveTimer: 0,
+    patBoost: 1.8,
+    treasureScale: 1,
   });
-  const rotYRef = useRef(-0.08); // Nearly straight-on cozy sitting pose like reference!
+  const rotYRef = useRef(-0.08);
+  const rebuildTreasuresRef = useRef<((items: HoardedItem[]) => void) | null>(null);
+
+  useEffect(() => {
+    onSelectHoardRef.current = onSelectHoardItem;
+  }, [onSelectHoardItem]);
 
   useEffect(() => {
     petRef.current = pet;
@@ -78,17 +96,26 @@ export default function KanShanStage3D({
 
   useEffect(() => {
     petRef.current = pet;
+    springRef.current.patBoost = 2.8;
+  }, [pet.snowballProgress]);
+
+  useEffect(() => {
+    petRef.current = pet;
   }, [pet]);
 
   useEffect(() => {
-    stackingRef.current = isStackingSnow;
-    springRef.current.jumpY = 0.09;
-  }, [isStackingSnow]);
+    hoardRef.current = hoardedItems;
+    springRef.current.treasureScale = 0.05; // Pop-in animation when treasures refresh!
+    rebuildTreasuresRef.current?.(hoardedItems);
+  }, [hoardedItems]);
 
   useEffect(() => {
-    bagRef.current = isBagCharmMode;
-    springRef.current.jumpY = 0.12;
-  }, [isBagCharmMode]);
+    huntingRef.current = isHuntingTreasure;
+    if (isHuntingTreasure) {
+      springRef.current.jumpY = 0.28;
+      springRef.current.waveTimer = 1.2;
+    }
+  }, [isHuntingTreasure]);
 
   useEffect(() => {
     recRef.current = isRecordingNose;
@@ -162,7 +189,6 @@ export default function KanShanStage3D({
     floorShadow.receiveShadow = true;
     roomGroup.add(floorShadow);
 
-    // Soft Vertical Ice Reflection Glow on Foreground Floor (like reference!)
     const iceSheen = new THREE.Mesh(
       new THREE.CircleGeometry(1.15, 36),
       new THREE.MeshBasicMaterial({
@@ -244,35 +270,47 @@ export default function KanShanStage3D({
     roomGroup.add(pawRug);
 
     // =========================================================
+    // 1.5 SPARKLING SCATTERED ROOM TREASURES (Directly Clickable!)
+    // =========================================================
+    const treasuresGroup = new THREE.Group();
+    roomGroup.add(treasuresGroup);
+
+    let activePods: ReturnType<typeof buildSparklingRoomTreasure>[] = [];
+    let treasureHitMeshes: THREE.Mesh[] = [];
+
+    const rebuildTreasures = (items: HoardedItem[]) => {
+      while (treasuresGroup.children.length > 0) {
+        treasuresGroup.remove(treasuresGroup.children[0]);
+      }
+      activePods = [];
+      treasureHitMeshes = [];
+
+      items.slice(0, 3).forEach((item, idx) => {
+        const pod = buildSparklingRoomTreasure(item.emoji, idx);
+        const [tx, ty, tz] = TREASURE_SPOTS[idx] || TREASURE_SPOTS[0];
+        pod.root.position.set(tx, ty, tz);
+        treasuresGroup.add(pod.root);
+        activePods.push(pod);
+        treasureHitMeshes.push(pod.hitMesh);
+      });
+    };
+
+    rebuildTreasuresRef.current = rebuildTreasures;
+    rebuildTreasures(hoardRef.current);
+
+    // =========================================================
     // 2. SITTING MARSHMALLOW LIU KANSHAN (PETITE COZY BLIND-BOX SCALE!)
     // =========================================================
     const charRoot = new THREE.Group();
-    // Sitting cozily right in the center of the puffy white paw rug!
     charRoot.position.set(0, -0.79, 0.22);
     scene.add(charRoot);
 
     const S = 1.02;
-    const K = S / 1.46; // Proportional scale ratio for limbs & props
-
-    // Bag Charm Lanyard
-    const lanyardGroup = new THREE.Group();
-    const strap = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.048 * K, 0.048 * K, 0.82 * K, 16),
-      new THREE.MeshStandardMaterial({ color: 0x4a8df8, roughness: 0.55 })
-    );
-    strap.position.set(0, 1.32 * K, -0.02 * K);
-    const clasp = new THREE.Mesh(
-      new THREE.TorusGeometry(0.18 * K, 0.036 * K, 16, 32),
-      new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.88, roughness: 0.18 })
-    );
-    clasp.position.set(0, 1.78 * K, -0.02 * K);
-    lanyardGroup.add(strap, clasp);
-    charRoot.add(lanyardGroup);
+    const K = S / 1.46;
 
     const kanshanRig = new THREE.Group();
     charRoot.add(kanshanRig);
 
-    // Designer-Toy Soft Flocked / Matte Vinyl Materials!
     const vinylWhiteMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: 0.72,
@@ -280,7 +318,6 @@ export default function KanShanStage3D({
       emissive: 0xf4f8ff,
       emissiveIntensity: 0.11,
     });
-    // Low-saturation velvety dark slate-navy (NOT harsh dead #000000!)
     const velvetSlateMat = new THREE.MeshStandardMaterial({
       color: 0x354054,
       roughness: 0.68,
@@ -297,10 +334,8 @@ export default function KanShanStage3D({
       metalness: 0.02,
     });
 
-    // A) 1:1 Wide-Head Marshmallow Sitting Body + Plump Tail
     const whiteBodyMesh = buildSmoothSDFMesh(76, vinylWhiteMat, (x, y, z) => {
       const dBody = evalCartoonKanshanSDF(x, y, z);
-      // Plump fluffy fox tail resting on the rug behind (-Y=-0.34) for 3-point blind-box stability!
       const dTail = sdSphere(x, y, z, 0, -0.32, -0.44, 0.148);
       return smin(dBody, dTail, 0.048);
     });
@@ -310,7 +345,6 @@ export default function KanShanStage3D({
     whiteBodyMesh.name = "head";
     kanshanRig.add(whiteBodyMesh);
 
-    // B) Two Chubby Marshmallow Sitting Short Feet in Front (Exact match to reference!)
     [-1, 1].forEach((side) => {
       const foot = new THREE.Mesh(
         new THREE.CapsuleGeometry(0.145 * K, 0.16 * K, 18, 24),
@@ -324,7 +358,6 @@ export default function KanShanStage3D({
       kanshanRig.add(foot);
     });
 
-    // C) Plump Velvety Round-Oval Rubber Nose Button (soft diffused sheen, zero harsh glare!)
     const blackNoseMesh = new THREE.Mesh(
       new THREE.SphereGeometry(1, 48, 36),
       noseRubberMat
@@ -335,7 +368,6 @@ export default function KanShanStage3D({
     blackNoseMesh.name = "nose";
     kanshanRig.add(blackNoseMesh);
 
-    // D) Iconic Minimalist Deadpan Small Dot Eyes (`•    •` — NO messy anime highlights!)
     const eyeX = 0.242;
     const eyeY = 0.238;
     const eyeZ = findFaceSurfaceZ(eyeX, eyeY);
@@ -353,7 +385,6 @@ export default function KanShanStage3D({
     beadEyesGroup.add(leftEye, rightEye);
     kanshanRig.add(beadEyesGroup);
 
-    // Happy Crescent Smile Eyes (`^    ^` when patted, fed, or stacking snowballs!)
     const happyEyesGroup = new THREE.Group();
     const arcGeo = new THREE.TorusGeometry(0.038 * S, 0.011 * S, 12, 24, Math.PI * 0.85);
     [-1, 1].forEach((side) => {
@@ -365,7 +396,6 @@ export default function KanShanStage3D({
     happyEyesGroup.visible = false;
     kanshanRig.add(happyEyesGroup);
 
-    // E) Plump Teardrop Plushie Arms (Thinner at shoulder, fuller & rounder at paw — resting beside feet!)
     const armY = -0.06;
     const armZ = 0.04;
     const shoulderSurfX = findSurfaceX(armY, armZ);
@@ -374,14 +404,12 @@ export default function KanShanStage3D({
       const pivot = new THREE.Group();
       pivot.position.set(side * (shoulderSurfX - 0.035) * S, armY * S, armZ * S);
 
-      // Build smooth teardrop-tapered plush arm using stacked spheres/capsules along curve
       const armCurve = new THREE.CatmullRomCurve3([
         new THREE.Vector3(0, 0, 0),
         new THREE.Vector3(side * 0.12 * K, -0.22 * K, 0.05 * K),
         new THREE.Vector3(side * 0.14 * K, -0.46 * K, 0.12 * K),
       ]);
 
-      // Tapered custom tube geometry (thicker toward the cute chubby paw!)
       const tubularSegs = 24;
       const radialSegs = 18;
       const frames = armCurve.computeFrenetFrames(tubularSegs, false);
@@ -393,16 +421,16 @@ export default function KanShanStage3D({
         const p = armCurve.getPointAt(u);
         const N = frames.normals[i];
         const B = frames.binormals[i];
-        // Taper from shoulder -> plump wrist!
         const r = (0.048 + u * 0.028) * K;
         for (let j = 0; j <= radialSegs; j++) {
           const v = (j / radialSegs) * Math.PI * 2;
           const sin = Math.sin(v);
           const cos = -Math.cos(v);
-          const vx = p.x + r * (cos * N.x + sin * B.x);
-          const vy = p.y + r * (cos * N.y + sin * B.y);
-          const vz = p.z + r * (cos * N.z + sin * B.z);
-          pos.push(vx, vy, vz);
+          pos.push(
+            p.x + r * (cos * N.x + sin * B.x),
+            p.y + r * (cos * N.y + sin * B.y),
+            p.z + r * (cos * N.z + sin * B.z)
+          );
         }
       }
       for (let i = 0; i < tubularSegs; i++) {
@@ -422,7 +450,6 @@ export default function KanShanStage3D({
       const armMesh = new THREE.Mesh(taperedGeo, velvetSlateMat);
       armMesh.castShadow = true;
 
-      // Plump rounded paw tip + cute little inner thumb nub!
       const pawEnd = new THREE.Mesh(new THREE.SphereGeometry(0.076 * K, 20, 20), velvetSlateMat);
       pawEnd.scale.set(0.95, 1.08, 0.95);
       pawEnd.position.set(side * 0.14 * K, -0.46 * K, 0.12 * K);
@@ -441,31 +468,31 @@ export default function KanShanStage3D({
     kanshanRig.add(leftArm, rightArm);
 
     // =========================================================
-    // 3. THREE FLUFFY STACKED SNOWBALLS RIGHT BETWEEN SITTING FEET!
+    // 3. SELF-STACKED SNOWBALLS BESIDE LIU KANSHAN ("他自己在那堆")
     // =========================================================
     const snowStack = new THREE.Group();
-    snowStack.position.set(0, -0.74 * K, 0.72 * K);
+    snowStack.position.set(-0.92 * K, -0.66 * K, 0.24 * K);
     const snowMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
-      roughness: 0.92,
+      roughness: 0.9,
       emissive: 0xf0f7ff,
-      emissiveIntensity: 0.1,
+      emissiveIntensity: 0.14,
     });
 
-    const sb1 = new THREE.Mesh(new THREE.SphereGeometry(0.21 * K, 24, 24), snowMat);
-    sb1.scale.set(1.08, 0.9, 1.08);
-    sb1.position.set(0, 0.14 * K, 0.12 * K);
+    const sb1 = new THREE.Mesh(new THREE.SphereGeometry(0.205 * K, 24, 24), snowMat);
+    sb1.scale.set(1.1, 0.88, 1.1);
+    sb1.position.set(0, 0.13 * K, 0);
     sb1.castShadow = true;
     sb1.name = "snowman";
 
-    const sb2 = new THREE.Mesh(new THREE.SphereGeometry(0.18 * K, 24, 24), snowMat);
-    sb2.scale.set(1.05, 0.92, 1.05);
-    sb2.position.set(0, 0.41 * K, 0.04 * K);
+    const sb2 = new THREE.Mesh(new THREE.SphereGeometry(0.165 * K, 24, 24), snowMat);
+    sb2.scale.set(1.06, 0.92, 1.06);
+    sb2.position.set(0.015 * K, 0.39 * K, 0);
     sb2.castShadow = true;
     sb2.name = "snowman";
 
-    const sb3 = new THREE.Mesh(new THREE.SphereGeometry(0.155 * K, 24, 24), snowMat);
-    sb3.position.set(0, 0.66 * K, -0.02 * K);
+    const sb3 = new THREE.Mesh(new THREE.SphereGeometry(0.135 * K, 24, 24), snowMat);
+    sb3.position.set(0.025 * K, 0.61 * K, 0);
     sb3.castShadow = true;
     sb3.name = "snowman";
 
@@ -479,7 +506,6 @@ export default function KanShanStage3D({
     kanshanRig.add(glassesGroup);
 
     const scarfGroup = buildContouredKnittedScarf(S);
-    scarfGroup.scale.setScalar(1); // Already built using S!
     kanshanRig.add(scarfGroup);
 
     const beanieGroup = buildKnittedBeanie(S);
@@ -517,6 +543,11 @@ export default function KanShanStage3D({
       pointer.x = ((cx - rect.left) / rect.width) * 2 - 1;
       pointer.y = -((cy - rect.top) / rect.height) * 2 + 1;
       raycaster.setFromCamera(pointer, camera);
+
+      // Prioritize clicking sparkling room treasures!
+      const treasureHits = raycaster.intersectObjects(treasureHitMeshes, false);
+      if (treasureHits.length > 0) return treasureHits[0].object.name;
+
       const hits = raycaster.intersectObjects(
         [blackNoseMesh, sb1, sb2, sb3, whiteBodyMesh],
         false
@@ -561,15 +592,19 @@ export default function KanShanStage3D({
         return;
       }
       const moved = Math.hypot(e.clientX - downX, e.clientY - downY);
-      if (moved < 7) {
+      if (moved < 8) {
         const hit = getHit(e.clientX, e.clientY);
-        if (hit === "snowman") {
+        if (hit && hit.startsWith("hoard_")) {
+          const idx = Number(hit.split("_")[1]);
+          const item = hoardRef.current[idx];
+          if (item) onSelectHoardRef.current(item);
+        } else if (hit === "snowman") {
           onTapSnowman();
         } else if (hit === "head" || hit === "nose") {
           springRef.current.sx = 1.08;
           springRef.current.sy = 0.91;
           springRef.current.jumpY = 0.1;
-          springRef.current.waveTimer = 1.2; // Cute greeting wave when patted!
+          springRef.current.waveTimer = 1.2;
           onTapHead();
         }
       }
@@ -597,25 +632,47 @@ export default function KanShanStage3D({
       const dt = Math.min(0.05, clock.getDelta());
       const t = clock.elapsedTime;
       const curPet = petRef.current;
-      const stacking = stackingRef.current;
-      const bagMode = bagRef.current;
+      const hunting = huntingRef.current;
       const rec = recRef.current;
 
-      roomGroup.visible = !bagMode;
-      lanyardGroup.visible = bagMode;
+      const sp = springRef.current;
+      if (sp.patBoost > 0) sp.patBoost = Math.max(0, sp.patBoost - dt);
+      sp.treasureScale += (1 - sp.treasureScale) * 0.12;
+      treasuresGroup.scale.setScalar(sp.treasureScale);
+
+      // Animate Sparkling Room Treasures (Levitating + Pulsing Halo + Twinkling 4-Point Stars!)
+      activePods.forEach((pod, idx) => {
+        const phase = t * 2.6 + idx * 2.1;
+        pod.propGroup.position.y = 0.22 + Math.sin(phase) * 0.045;
+        pod.propGroup.rotation.y = Math.sin(t * 1.1 + idx) * 0.35;
+
+        const haloPulse = 0.92 + Math.sin(phase * 1.3) * 0.16;
+        pod.haloMesh.scale.set(haloPulse, haloPulse, 1);
+
+        pod.stars.forEach((star, sIdx) => {
+          const spPhase = t * 5.2 + idx * 1.7 + sIdx * 2.1;
+          const twinkle = Math.max(0.15, (Math.sin(spPhase) + 1) * 0.58);
+          star.scale.setScalar(twinkle);
+          star.rotation.z = t * 1.2 + sIdx;
+          star.lookAt(camera.position);
+        });
+      });
 
       const eq = curPet.equippedItems || [];
       glassesGroup.visible = eq.includes("thick_glasses");
       scarfGroup.visible = eq.includes("zhihu_scarf");
       beanieGroup.visible = eq.includes("camp_beanie");
-      fishGroup.visible = eq.includes("codfish_plush") && !stacking;
+      fishGroup.visible = eq.includes("codfish_plush");
       muffsGroup.visible = eq.includes("ear_muffs");
 
-      const sp = springRef.current;
       if (sp.waveTimer > 0) sp.waveTimer = Math.max(0, sp.waveTimer - dt);
 
-      // Blink vs Happy Crescent Eyes
-      const isSmiling = stacking || curPet.mood === "happy" || sp.waveTimer > 0;
+      // Autonomous Snowball Stacking Cycle ("他自己在那堆")
+      const autoPatWindow = (t % 6.4) < 2.7 || sp.patBoost > 0;
+      sp.armLerp += ((autoPatWindow && !hunting ? 1 : 0) - sp.armLerp) * 0.12;
+      const patWave = Math.max(0, Math.sin(t * 8.6)) * sp.armLerp;
+
+      const isSmiling = hunting || curPet.mood === "happy" || sp.waveTimer > 0 || sp.armLerp > 0.65;
       happyEyesGroup.visible = isSmiling;
       beadEyesGroup.visible = !isSmiling;
       if (!isSmiling) {
@@ -624,38 +681,39 @@ export default function KanShanStage3D({
         rightEye.scale.set(0.92, blink ? 0.15 : 1.18, 0.7);
       }
 
-      // Arms Tween: Resting cutely beside sitting feet vs Hugging the top snowball (Image 2!)
-      sp.armLerp += ((stacking ? 1 : 0) - sp.armLerp) * 0.14;
       const baseArmX = (shoulderSurfX - 0.035) * S;
-      const hugArmX = 0.38 * S;
-      const curArmY = (armY - sp.armLerp * 0.04) * S;
-      const curArmZ = (armZ + sp.armLerp * 0.24) * S;
+      // Left arm reaches over so paw lands cleanly on top of the 3rd snowball!
+      leftArm.position.set(
+        -(baseArmX + 0.06 * S * sp.armLerp),
+        (armY + 0.08 * sp.armLerp - patWave * 0.038) * S,
+        (armZ + 0.1 * sp.armLerp) * S
+      );
+      leftArm.rotation.x = -sp.armLerp * (0.48 + patWave * 0.2);
+      leftArm.rotation.y = -sp.armLerp * 0.18;
+      leftArm.rotation.z = -sp.armLerp * (0.42 - patWave * 0.16) + (1 - sp.armLerp) * Math.sin(t * 1.8) * 0.025;
 
-      leftArm.position.set(-(baseArmX + (hugArmX - baseArmX) * sp.armLerp), curArmY, curArmZ);
-      rightArm.position.set(baseArmX + (hugArmX - baseArmX) * sp.armLerp, curArmY, curArmZ);
-
-      leftArm.rotation.x = -sp.armLerp * 0.88;
-      leftArm.rotation.y = sp.armLerp * 0.42;
-      leftArm.rotation.z = sp.armLerp * 0.56 + (1 - sp.armLerp) * Math.sin(t * 1.8) * 0.025;
-
-      // Cute right-hand wave when patted (`打招呼`)!
-      if (sp.waveTimer > 0 && sp.armLerp < 0.2) {
+      // Right arm stays relaxed or waves happily when patted
+      rightArm.position.set(baseArmX, armY * S, armZ * S);
+      if (sp.waveTimer > 0) {
         rightArm.rotation.z = -2.1 + Math.sin(t * 16) * 0.28;
         rightArm.rotation.x = -0.3;
+        rightArm.rotation.y = 0;
       } else {
-        rightArm.rotation.x = -sp.armLerp * 0.88;
-        rightArm.rotation.y = -sp.armLerp * 0.42;
-        rightArm.rotation.z = -sp.armLerp * 0.56 - (1 - sp.armLerp) * Math.sin(t * 1.8) * 0.025;
+        rightArm.rotation.x = 0;
+        rightArm.rotation.y = 0;
+        rightArm.rotation.z = -Math.sin(t * 1.8) * 0.025;
       }
 
-      snowStack.visible = !bagMode && (stacking || sp.armLerp > 0.08);
-      const sScale = stacking ? 1.0 : 0.001;
-      snowStack.scale.lerp(new THREE.Vector3(sScale, sScale, sScale), 0.16);
+      // Snowman stays beside Kanshan and gently squishes as he pats the top snowball!
+      const progFactor = 0.88 + Math.min(1, (curPet.snowballProgress || 66) / 100) * 0.14;
+      snowStack.visible = true;
+      snowStack.scale.setScalar(progFactor);
+      sb3.scale.set(1 + patWave * 0.07, 1 - patWave * 0.09, 1 + patWave * 0.07);
+      sb3.position.y = (0.61 - patWave * 0.025) * K;
 
       const nScale = rec ? 0.93 : 1.0;
       blackNoseMesh.scale.set(0.165 * S * nScale, 0.145 * S * nScale, 0.132 * S * nScale);
 
-      // Living Cozy Micro-Motion: Gentle slow side-to-side rock (`晃悠`) + soft breathing!
       sp.sx += (1 - sp.sx) * 0.14;
       sp.sy += (1 - sp.sy) * 0.14;
       sp.sz += (1 - sp.sz) * 0.14;
@@ -663,11 +721,11 @@ export default function KanShanStage3D({
 
       const breath = Math.sin(t * 2.1) * 0.012;
       kanshanRig.scale.set(sp.sx - breath * 0.35, sp.sy + breath, sp.sz - breath * 0.35);
-      // Gentle adorable head/body tilt rock (`晃悠`)
-      kanshanRig.rotation.z = Math.sin(t * 1.35) * 0.022;
+      // Subtle lean toward the snowman when patting it!
+      kanshanRig.rotation.z = Math.sin(t * 1.35) * 0.018 + sp.armLerp * 0.045;
 
-      const baseY = bagMode ? -0.35 + Math.sin(t * 2) * 0.05 : -0.79;
-      charRoot.position.y = baseY + sp.jumpY;
+      const huntHop = hunting ? Math.abs(Math.sin(t * 12)) * 0.16 : 0;
+      charRoot.position.y = -0.79 + sp.jumpY + huntHop;
       charRoot.rotation.y += (rotYRef.current - charRoot.rotation.y) * 0.12;
 
       renderer.render(scene, camera);

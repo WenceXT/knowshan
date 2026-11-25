@@ -27,7 +27,8 @@ type DrawerType =
   | "bubble"
   | "diary"
   | "snowman"
-  | "outdoors"
+  | "treasure"
+  | "replies"
   | "settings";
 
 const VOICE_PRESETS = [
@@ -45,7 +46,7 @@ const VOICE_PRESETS = [
   },
 ];
 
-// Hand-crafted soft vector icons for wardrobe & hoard items (zero system emojis!)
+// Hand-crafted soft vector icons for wardrobe & sparkling hoard items (zero system emojis!)
 function ItemVectorIcon({ id }: { id: string }) {
   switch (id) {
     case "thick_glasses":
@@ -72,12 +73,14 @@ function ItemVectorIcon({ id }: { id: string }) {
         </svg>
       );
     case "codfish_plush":
+    case "fish":
     case "h-2":
       return (
         <svg viewBox="0 0 36 36" className="w-8 h-8">
           <ellipse cx="16" cy="18" rx="10" ry="6.5" fill="#7dd3fc" />
           <polygon points="25,18 32,12 32,24" fill="#38bdf8" />
           <circle cx="11" cy="16.5" r="1.5" fill="#1e293b" />
+          <path d="M27 7 L28 9.5 L30.5 10.5 L28 11.5 L27 14 L26 11.5 L23.5 10.5 L26 9.5 Z" fill="#facc15" />
         </svg>
       );
     case "ear_muffs":
@@ -88,19 +91,78 @@ function ItemVectorIcon({ id }: { id: string }) {
           <circle cx="28" cy="21" r="5" fill="#fda4af" />
         </svg>
       );
+    case "card":
     case "h-1":
       return (
         <svg viewBox="0 0 36 36" className="w-8 h-8">
-          <rect x="8" y="7" width="20" height="22" rx="4" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2" />
-          <line x1="13" y1="14" x2="23" y2="14" stroke="#d97706" strokeWidth="2" strokeLinecap="round" />
-          <line x1="13" y1="20" x2="20" y2="20" stroke="#d97706" strokeWidth="2" strokeLinecap="round" />
+          <rect x="7" y="8" width="22" height="20" rx="4" fill="#fef3c7" stroke="#f59e0b" strokeWidth="2" />
+          <line x1="12" y1="14" x2="24" y2="14" stroke="#d97706" strokeWidth="2" strokeLinecap="round" />
+          <line x1="12" y1="19" x2="20" y2="19" stroke="#d97706" strokeWidth="2" strokeLinecap="round" />
+          <circle cx="23" cy="21" r="2.8" fill="#fb7185" />
+        </svg>
+      );
+    case "star_jar":
+      return (
+        <svg viewBox="0 0 36 36" className="w-8 h-8">
+          <rect x="13" y="6" width="10" height="4" rx="1.8" fill="#d97706" />
+          <rect x="9" y="10" width="18" height="20" rx="6" fill="#dbeafe" stroke="#60a5fa" strokeWidth="2" />
+          <path d="M18 14 L19.8 18 L24 18.5 L20.8 21.3 L21.7 25.5 L18 23.3 L14.3 25.5 L15.2 21.3 L12 18.5 L16.2 18 Z" fill="#facc15" />
+        </svg>
+      );
+    case "cocoa":
+      return (
+        <svg viewBox="0 0 36 36" className="w-8 h-8">
+          <rect x="8" y="13" width="17" height="16" rx="5" fill="#fb7185" />
+          <ellipse cx="16.5" cy="14" rx="7.5" ry="3" fill="#fffbeb" />
+          <path d="M25 16 A4 4 0 0 1 25 25" fill="none" stroke="#fb7185" strokeWidth="2.8" />
+          <path d="M14 7 Q15.5 9.5 14 11" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
+          <path d="M19 6 Q20.5 8.5 19 10.5" fill="none" stroke="#f59e0b" strokeWidth="2" strokeLinecap="round" />
+        </svg>
+      );
+    case "plane":
+      return (
+        <svg viewBox="0 0 36 36" className="w-8 h-8">
+          <polygon points="5,18 31,8 23,28 17,21" fill="#93c5fd" stroke="#3b82f6" strokeWidth="1.8" strokeLinejoin="round" />
+          <line x1="31" y1="8" x2="17" y2="21" stroke="#2563eb" strokeWidth="1.8" />
+        </svg>
+      );
+    case "shell":
+      return (
+        <svg viewBox="0 0 36 36" className="w-8 h-8">
+          <path d="M7 22 C7 11 29 11 29 22 L24 28 L12 28 Z" fill="#fbcfe8" stroke="#f472b6" strokeWidth="2" strokeLinejoin="round" />
+          <line x1="18" y1="13" x2="18" y2="27" stroke="#f472b6" strokeWidth="1.6" />
+          <line x1="13" y1="15" x2="15" y2="27" stroke="#f472b6" strokeWidth="1.6" />
+          <line x1="23" y1="15" x2="21" y2="27" stroke="#f472b6" strokeWidth="1.6" />
+        </svg>
+      );
+    case "bell":
+      return (
+        <svg viewBox="0 0 36 36" className="w-8 h-8">
+          <path d="M18 7 A8 8 0 0 0 10 15 L10 22 L7 25 L29 25 L26 22 L26 15 A8 8 0 0 0 18 7 Z" fill="#facc15" stroke="#eab308" strokeWidth="1.8" strokeLinejoin="round" />
+          <circle cx="18" cy="27.5" r="3" fill="#d97706" />
+        </svg>
+      );
+    case "crystal":
+      return (
+        <svg viewBox="0 0 36 36" className="w-8 h-8">
+          <polygon points="18,5 27,15 23,29 13,29 9,15" fill="#a5f3fc" stroke="#38bdf8" strokeWidth="2" strokeLinejoin="round" />
+          <polyline points="9,15 18,19 27,15" fill="none" stroke="#0284c7" strokeWidth="1.6" />
+          <line x1="18" y1="5" x2="18" y2="29" stroke="#0284c7" strokeWidth="1.6" />
+        </svg>
+      );
+    case "acorn":
+      return (
+        <svg viewBox="0 0 36 36" className="w-8 h-8">
+          <path d="M18 6 L18 10" stroke="#78350f" strokeWidth="2.6" strokeLinecap="round" />
+          <ellipse cx="18" cy="13.5" rx="10" ry="4.8" fill="#92400e" />
+          <path d="M10 15 C10 26 18 30 18 30 C18 30 26 26 26 15 Z" fill="#f59e0b" />
         </svg>
       );
     default:
       return (
         <svg viewBox="0 0 36 36" className="w-8 h-8">
-          <circle cx="18" cy="18" r="10" fill="#c4b5fd" />
-          <circle cx="15" cy="15" r="3" fill="#ede9fe" />
+          <circle cx="18" cy="18" r="10" fill="#fde047" />
+          <circle cx="15" cy="15" r="3" fill="#fef9c3" />
         </svg>
       );
   }
@@ -110,8 +172,7 @@ export default function CozyKnowShanApp() {
   const [store, setStore] = useState<KnowShanStore | null>(null);
   const [accessories, setAccessories] = useState<AccessoryItem[]>([]);
   const [drawer, setDrawer] = useState<DrawerType>(null);
-  const [isStackingSnow, setIsStackingSnow] = useState(false);
-  const [isBagCharmMode, setIsBagCharmMode] = useState(false);
+  const [isHuntingTreasure, setIsHuntingTreasure] = useState(false);
   const [isRecordingNose, setIsRecordingNose] = useState(false);
   const [isFullWindow, setIsFullWindow] = useState(true);
   const [renderMode, setRenderMode] = useState<"3d" | "2d">("3d");
@@ -139,7 +200,7 @@ export default function CozyKnowShanApp() {
     setToast(msg);
     setTimeout(() => {
       setToast((prev) => (prev === msg ? null : prev));
-    }, 2400);
+    }, 2500);
   };
 
   useEffect(() => {
@@ -172,10 +233,11 @@ export default function CozyKnowShanApp() {
     const d = await apiPostState(payload);
     if (d.error) {
       showToast(d.error);
-      return;
+      return null;
     }
     if (d.store) setStore(d.store);
     if (d.accessories) setAccessories(d.accessories);
+    return d.store as KnowShanStore | null;
   };
 
   const handleNoseStart = () => {
@@ -200,33 +262,39 @@ export default function CozyKnowShanApp() {
   };
 
   const handleFeedCodfish = async () => {
-    setIsStackingSnow(false);
     await postState({ action: "hardware_interact", interactType: "head_pat" });
     showToast("喂了一小块银鳕鱼");
   };
 
-  const handleToggleSnowStack = () => {
-    const next = !isStackingSnow;
-    setIsStackingSnow(next);
-    if (next) {
-      showToast("团好三颗雪球啦，点雪球看看");
+  const handleSelectHoardInRoom = (item: HoardedItem) => {
+    setSelectedHoard(item);
+    setDrawer("treasure");
+  };
+
+  const handleGoOutdoors = async () => {
+    if (isHuntingTreasure) return;
+    setIsHuntingTreasure(true);
+    showToast("看山跑去雪原寻宝啦…");
+    const updated = await postState({ action: "refresh_hoard" });
+    if (updated?.hoardedItems?.[0]) {
+      setSelectedHoard(updated.hoardedItems[0]);
     }
+    setTimeout(() => {
+      setIsHuntingTreasure(false);
+      showToast("叼回三件闪闪发光的新小物件，点地上看看吧");
+    }, 850);
   };
 
   const submitWhisper = async () => {
     if (!whisperInput.trim()) return;
     setBusy(true);
     try {
-      const d = await apiSubmitWhisper(
-        whisperInput.trim(),
-        isBagCharmMode ? "hardware_nose" : "web_diary"
-      );
+      const d = await apiSubmitWhisper(whisperInput.trim(), "web_diary");
       if (d.store) {
         setStore(d.store);
         setWhisperInput("");
-        setIsStackingSnow(true);
         setDrawer(null);
-        showToast("已替你收进雪球里");
+        showToast("看山听完拍了拍雪球，冒出了一个新提问");
       }
     } finally {
       setBusy(false);
@@ -243,7 +311,6 @@ export default function CozyKnowShanApp() {
       const d = await apiSendBubble(store.activeQuestionId, text);
       if (d.store) {
         setStore(d.store);
-        setIsStackingSnow(true);
       }
     } finally {
       setBusy(false);
@@ -252,7 +319,6 @@ export default function CozyKnowShanApp() {
 
   const openSnowmanLetter = async () => {
     if (!store) return;
-    setIsStackingSnow(true);
     const info = await apiGenerateDraft(store.activeQuestionId);
     setDraftInfo(info);
     setHideNames(true);
@@ -272,7 +338,7 @@ export default function CozyKnowShanApp() {
       });
       if (d.store) {
         setStore(d.store);
-        setDrawer("outdoors");
+        setDrawer("replies");
         showToast("寄出啦，收到了暖心回应");
       }
     } finally {
@@ -287,6 +353,8 @@ export default function CozyKnowShanApp() {
   const activeQ =
     store.questions.find((q) => q.id === store.activeQuestionId) || store.questions[0];
   const activeMsgs = store.dialogues[activeQ.id] || [];
+  const activeQuestionBubble =
+    store.whispers[0]?.bubbleQuestion || activeQ.bubblePrompt || activeQ.title;
   const coinDisplay = `${((store.pet.exp * 15 + 200) / 1000).toFixed(1)}k`;
   const levelBarPct = Math.min(100, Math.max(36, ((store.pet.exp % 120) / 120) * 100));
 
@@ -386,8 +454,6 @@ export default function CozyKnowShanApp() {
           <button
             onClick={() => {
               if (drawer) setDrawer(null);
-              else if (isBagCharmMode) setIsBagCharmMode(false);
-              else setIsStackingSnow(false);
             }}
             className="w-11 h-11 rounded-full bg-[#fdfbf7]/95 shadow-[0_3px_10px_rgba(120,150,190,0.18)] flex items-center justify-center active:scale-95 transition cursor-pointer shrink-0"
           >
@@ -445,7 +511,7 @@ export default function CozyKnowShanApp() {
         </div>
 
         {/* ============================================================= */}
-        {/* SUB-HEADER ROW (Share | Plump Star + Paw + Coin | Bag Charm)  */}
+        {/* SUB-HEADER ROW (Share | Plump Star + Paw + Coin | Clean Balance) */}
         {/* ============================================================= */}
         <div className="relative z-20 px-4 pt-2.5 flex items-center justify-between gap-2 max-w-xl mx-auto">
           {/* Share / Letter Button */}
@@ -486,7 +552,9 @@ export default function CozyKnowShanApp() {
 
             {/* Pink Paw Prints */}
             <button
-              onClick={openSnowmanLetter}
+              onClick={() =>
+                store.publishedAnswers.length > 0 ? setDrawer("replies") : openSnowmanLetter()
+              }
               className="h-7 pr-3 pl-1 rounded-full bg-[#92aacb]/65 backdrop-blur-md flex items-center gap-1.5 cursor-pointer"
             >
               <span className="w-5.5 h-5.5 rounded-full bg-[#fdfbf7] flex items-center justify-center shadow-2xs">
@@ -517,23 +585,8 @@ export default function CozyKnowShanApp() {
             </div>
           </div>
 
-          {/* Bag Charm Toggle Button */}
-          <button
-            onClick={() => {
-              const next = !isBagCharmMode;
-              setIsBagCharmMode(next);
-              showToast(next ? "已挂到包上，长按黑鼻子可说悄悄话" : "回到冰屋地毯啦");
-            }}
-            className={`w-11 h-11 rounded-full backdrop-blur-md shadow-[0_3px_10px_rgba(120,150,190,0.2)] flex items-center justify-center active:scale-95 transition cursor-pointer shrink-0 ${
-              isBagCharmMode ? "bg-[#5b9bf8] ring-2 ring-white" : "bg-[#8fa8cb]/80"
-            }`}
-          >
-            <svg viewBox="0 0 28 28" className="w-6 h-6">
-              <circle cx="14" cy="7" r="3" fill="#fbbf24" />
-              <path d="M7 20 C7 12 21 12 21 20 Z" fill="#1e293b" />
-              <rect x="6" y="19" width="16" height="3.2" rx="1.5" fill="#fbbf24" />
-            </svg>
-          </button>
+          {/* Invisible spacer keeps the 3 status pills symmetrically centered */}
+          <div className="w-11 h-11 shrink-0 pointer-events-none" aria-hidden="true" />
         </div>
 
         {/* ============================================================= */}
@@ -595,7 +648,7 @@ export default function CozyKnowShanApp() {
         </div>
 
         {/* ============================================================= */}
-        {/* SOFT NATURAL MURMUR BUBBLE (Zero Tutorial / AI Tone!)         */}
+        {/* EXPERIENCE-LINKED TOPIC QUESTION BUBBLE ("提问题的那个提问")   */}
         {/* ============================================================= */}
         {toast ? (
           <div className="absolute top-[166px] left-1/2 -translate-x-1/2 z-30 px-4 py-1.5 rounded-full bg-[#52657c]/85 backdrop-blur-md text-white text-[13px] font-medium shadow-sm whitespace-nowrap">
@@ -603,27 +656,30 @@ export default function CozyKnowShanApp() {
           </div>
         ) : (
           <button
-            onClick={() => (isStackingSnow ? openSnowmanLetter() : setDrawer("bubble"))}
-            className="absolute top-[224px] left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 rounded-full bg-[#fdfbf7]/85 hover:bg-[#fdfbf7] backdrop-blur-md shadow-[0_4px_14px_rgba(130,160,200,0.18)] text-[13px] font-semibold text-[#6e4720] whitespace-nowrap transition cursor-pointer"
+            onClick={() => setDrawer("bubble")}
+            className={`absolute top-[200px] left-1/2 -translate-x-1/2 z-10 w-max ${
+              isFullWindow ? "max-w-[260px] sm:max-w-[380px]" : "max-w-[248px]"
+            } px-3.5 py-2 rounded-[22px] bg-[#fdfbf7]/94 hover:bg-[#fdfbf7] backdrop-blur-md shadow-[0_4px_16px_rgba(116,150,196,0.2)] flex items-start gap-2 text-left transition cursor-pointer`}
           >
-            {isStackingSnow
-              ? "三颗雪球团好咯，拆开看看吧"
-              : isBagCharmMode
-              ? "长按黑鼻头，跟我说句悄悄话"
-              : "昨晚那件事，外面也有好多人睡不着在聊"}
-            <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-2.5 h-2.5 bg-[#fdfbf7]/90 rotate-45" />
+            <span className="mt-0.5 w-4.5 h-4.5 rounded-full bg-[#63a4f7] text-white text-[11px] font-bold flex items-center justify-center shrink-0">
+              ?
+            </span>
+            <span className="text-[13px] font-bold text-[#6e4720] leading-snug">
+              {isHuntingTreasure ? "去雪原上替你翻新宝贝咯…" : activeQuestionBubble}
+            </span>
+            <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-3 h-3 bg-[#fdfbf7]/92 rotate-45" />
           </button>
         )}
 
         {/* ============================================================= */}
-        {/* FULL-BLEED 3D OR 2D STAGE                                     */}
+        {/* FULL-BLEED 3D OR 2D STAGE (Autonomous Snowman + Room Items!)  */}
         {/* ============================================================= */}
         <div className="absolute inset-0 z-0">
           {renderMode === "3d" ? (
             <KanShanStage3D
               pet={store.pet}
-              isStackingSnow={isStackingSnow}
-              isBagCharmMode={isBagCharmMode}
+              hoardedItems={store.hoardedItems}
+              isHuntingTreasure={isHuntingTreasure}
               isRecordingNose={isRecordingNose}
               onTapHead={() => {
                 showToast("蹭了蹭你的手心");
@@ -632,12 +688,13 @@ export default function CozyKnowShanApp() {
               onTapNoseStart={handleNoseStart}
               onTapNoseEnd={handleNoseEnd}
               onTapSnowman={openSnowmanLetter}
+              onSelectHoardItem={handleSelectHoardInRoom}
             />
           ) : (
             <KanShanStage2D
               pet={store.pet}
-              isStackingSnow={isStackingSnow}
-              isBagCharmMode={isBagCharmMode}
+              hoardedItems={store.hoardedItems}
+              isHuntingTreasure={isHuntingTreasure}
               isRecordingNose={isRecordingNose}
               onTapHead={() => {
                 showToast("蹭了蹭你的手心");
@@ -646,14 +703,15 @@ export default function CozyKnowShanApp() {
               onTapNoseStart={handleNoseStart}
               onTapNoseEnd={handleNoseEnd}
               onTapSnowman={openSnowmanLetter}
+              onSelectHoardItem={handleSelectHoardInRoom}
             />
           )}
         </div>
 
         {/* ============================================================= */}
-        {/* RIGHT TRANSLUCENT PILL (Custom Pastel Vector Icons!)          */}
+        {/* RIGHT TRANSLUCENT PILL (Feed + Whisper Only — Clean & Compact)*/}
         {/* ============================================================= */}
-        <div className="absolute right-4 top-[332px] z-20 w-[64px] py-4 rounded-full bg-white/58 backdrop-blur-md border border-white/70 shadow-[0_6px_24px_rgba(125,158,200,0.18)] flex flex-col items-center gap-5">
+        <div className="absolute right-4 top-[250px] z-20 w-[62px] py-3.5 rounded-full bg-white/58 backdrop-blur-md border border-white/70 shadow-[0_6px_24px_rgba(125,158,200,0.18)] flex flex-col items-center gap-4">
           {/* 喂食: Plump Orange Pet Bowl with White Paw */}
           <button
             onClick={handleFeedCodfish}
@@ -669,27 +727,6 @@ export default function CozyKnowShanApp() {
               <circle cx="23.2" cy="20.5" r="1.1" fill="#fff7ed" />
             </svg>
             <span className="text-[13px] font-bold text-[#784315]">喂食</span>
-          </button>
-
-          {/* 堆雪: Plump Rounded Snowball / Butter Bar */}
-          <button
-            onClick={handleToggleSnowStack}
-            className="flex flex-col items-center gap-1 active:scale-95 transition cursor-pointer"
-          >
-            <svg viewBox="0 0 40 40" className="w-10 h-10">
-              <circle
-                cx="20"
-                cy="24"
-                r="10"
-                fill={isStackingSnow ? "#60a5fa" : "#fde047"}
-              />
-              <circle cx="20" cy="13" r="7" fill="#ffffff" />
-              <circle cx="17.8" cy="12.2" r="1.1" fill="#334155" />
-              <circle cx="22.2" cy="12.2" r="1.1" fill="#334155" />
-            </svg>
-            <span className="text-[13px] font-bold text-[#784315]">
-              {isStackingSnow ? "收起" : "堆雪"}
-            </span>
           </button>
 
           {/* 树洞: Pink + Blue Twin Blobs */}
@@ -711,15 +748,20 @@ export default function CozyKnowShanApp() {
         </div>
 
         {/* ============================================================= */}
-        {/* BOTTOM CURVED SNOW DOME (`出门` Pastel Globe)                 */}
+        {/* BOTTOM CURVED SNOW DOME (`出门` Refreshes Room Treasures!)    */}
         {/* ============================================================= */}
         <div
-          onClick={() => setDrawer("outdoors")}
-          className="absolute -bottom-8 left-[-10%] right-[-10%] h-38 z-20 rounded-t-[100%] bg-gradient-to-b from-white/55 via-white/78 to-white/94 backdrop-blur-md border-t border-white/85 flex flex-col items-center pt-3 cursor-pointer hover:from-white/70 transition"
+          onClick={handleGoOutdoors}
+          className="absolute -bottom-8 left-[-10%] right-[-10%] h-38 z-20 rounded-t-[100%] bg-gradient-to-b from-white/55 via-white/78 to-white/94 backdrop-blur-md border-t border-white/85 flex flex-col items-center pt-3 cursor-pointer hover:from-white/70 active:scale-[0.99] transition"
         >
           <div className="w-8 h-1 rounded-full bg-white mb-2.5" />
           <div className="relative">
-            <svg viewBox="0 0 48 48" className="w-12 h-12 drop-shadow-2xs">
+            <svg
+              viewBox="0 0 48 48"
+              className={`w-12 h-12 drop-shadow-2xs transition-transform duration-500 ${
+                isHuntingTreasure ? "rotate-180 scale-110" : ""
+              }`}
+            >
               <circle cx="24" cy="24" r="19" fill="#93d5ff" />
               <path
                 d="M14 14 C18 13, 22 16, 21 21 C20 25, 14 26, 12 31 C9 27, 9 19, 14 14 Z"
@@ -730,9 +772,11 @@ export default function CozyKnowShanApp() {
                 fill="#6ee7b7"
               />
             </svg>
-            <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-[#f97316] border-2 border-white" />
+            <span className="absolute top-0.5 right-0.5 w-3.5 h-3.5 rounded-full bg-[#facc15] border-2 border-white shadow-2xs" />
           </div>
-          <span className="text-[14px] font-bold text-[#784315] mt-0.5">出门</span>
+          <span className="text-[14px] font-bold text-[#784315] mt-0.5">
+            {isHuntingTreasure ? "寻宝中…" : "出门"}
+          </span>
         </div>
 
         {/* ============================================================= */}
@@ -745,7 +789,7 @@ export default function CozyKnowShanApp() {
           >
             <div
               onClick={(e) => e.stopPropagation()}
-              className="w-full max-w-lg rounded-t-[36px] bg-[#f9fbff]/96 backdrop-blur-xl border-t border-white shadow-[0_-12px_40px_rgba(65,98,145,0.18)] p-5 pb-7 max-h-[64%] overflow-y-auto space-y-4"
+              className="w-full max-w-lg rounded-t-[36px] bg-[#f9fbff]/96 backdrop-blur-xl border-t border-white shadow-[0_-12px_40px_rgba(65,98,145,0.18)] p-5 pb-7 max-h-[66%] overflow-y-auto space-y-4"
             >
               <div className="flex items-center justify-between">
                 <div className="flex items-center gap-2.5">
@@ -767,7 +811,8 @@ export default function CozyKnowShanApp() {
                     {drawer === "bubble" && "外面的同频夜话"}
                     {drawer === "diary" && "悄悄话本子"}
                     {drawer === "snowman" && "雪球里的信"}
-                    {drawer === "outdoors" && "出门捡回来的小东西"}
+                    {drawer === "treasure" && (selectedHoard?.itemName || "屋里发光的小物件")}
+                    {drawer === "replies" && "雪球收到的回音"}
                     {drawer === "settings" && "性格波长"}
                   </span>
                 </div>
@@ -908,7 +953,7 @@ export default function CozyKnowShanApp() {
                       onClick={openSnowmanLetter}
                       className="px-3.5 py-2.5 rounded-full bg-[#fde047] text-[#784315] text-[13px] font-bold whitespace-nowrap cursor-pointer"
                     >
-                      装进雪球
+                      看雪球信
                     </button>
                   </div>
                 </div>
@@ -992,57 +1037,106 @@ export default function CozyKnowShanApp() {
                 </div>
               )}
 
-              {/* OUTDOORS */}
-              {drawer === "outdoors" && (
+              {/* DIRECT ROOM TREASURE CARD (Clicked directly from glowing 3D/2D room item!) */}
+              {drawer === "treasure" && selectedHoard && (
                 <div className="space-y-3">
-                  {store.publishedAnswers.length > 0 && (
-                    <div className="p-3.5 rounded-[22px] bg-[#fff8eb] space-y-1.5">
-                      <div className="text-[13px] font-bold text-[#9a5b25]">
-                        刚寄出的雪球收到了 {store.publishedAnswers[0].upvotes} 份赞同
-                      </div>
-                      <p className="text-[13px] text-[#5c4a3a] bg-white/90 p-3 rounded-[16px]">
-                        {store.publishedAnswers[0].warmComments[0].author}：「
-                        {store.publishedAnswers[0].warmComments[0].text}」
-                      </p>
+                  <div className="p-3.5 rounded-[22px] bg-gradient-to-r from-[#fff9db] via-[#fef5c8] to-[#edf6ff] border border-[#fde68a]/80 flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-2xl bg-white/95 shadow-2xs flex items-center justify-center shrink-0">
+                      <ItemVectorIcon id={selectedHoard.emoji || selectedHoard.id} />
                     </div>
-                  )}
-                  <div className="grid grid-cols-3 gap-2.5">
-                    {store.hoardedItems.map((h) => (
-                      <button
-                        key={h.id}
-                        onClick={() => setSelectedHoard(h)}
-                        className={`p-3 rounded-[22px] text-center flex flex-col items-center gap-1 cursor-pointer ${
-                          selectedHoard?.id === h.id
-                            ? "bg-[#e1effe] ring-2 ring-[#7cb4f8]"
-                            : "bg-white shadow-[0_2px_8px_rgba(148,179,214,0.12)]"
-                        }`}
-                      >
-                        <ItemVectorIcon id={h.id} />
-                        <div className="text-[12px] font-bold text-[#5a4636] line-clamp-1">
-                          {h.itemName}
-                        </div>
-                      </button>
-                    ))}
-                  </div>
-                  {selectedHoard && (
-                    <div className="p-4 rounded-[22px] bg-white shadow-[0_2px_10px_rgba(148,179,214,0.12)] space-y-1.5">
-                      <div className="text-[12px] text-[#5b8fd9] font-semibold">
+                    <div className="leading-snug">
+                      <div className="text-[12px] font-bold text-[#b46914]">
+                        看山从外面衔回屋里的小物件
+                      </div>
+                      <div className="text-[13px] text-[#5c4a3a] mt-0.5">
                         {selectedHoard.reason}
                       </div>
-                      <div className="text-[14px] font-bold text-[#4c3b2e]">
-                        {selectedHoard.postTitle}
-                      </div>
-                      <p className="text-[13px] text-[#6e7f94] leading-relaxed">
-                        {selectedHoard.excerpt}
-                      </p>
+                    </div>
+                  </div>
+
+                  <div className="p-4 rounded-[22px] bg-white shadow-[0_2px_12px_rgba(148,179,214,0.14)] space-y-2">
+                    <div className="flex items-center justify-between gap-2 text-[12px] text-[#7c8da3]">
+                      <span className="font-semibold text-[#528be0]">{selectedHoard.author}</span>
+                      <span>知乎高赞回答</span>
+                    </div>
+                    <div className="text-[15px] font-bold text-[#4c3b2e] leading-snug">
+                      {selectedHoard.postTitle}
+                    </div>
+                    <p className="text-[13px] text-[#64758b] leading-relaxed">
+                      {selectedHoard.excerpt}
+                    </p>
+                    <div className="pt-1 flex items-center justify-between">
                       <a
                         href={selectedHoard.zhihuUrl}
                         target="_blank"
                         rel="noreferrer"
-                        className="inline-block text-[13px] font-bold text-[#528be0] pt-1"
+                        className="px-4 py-2 rounded-full bg-[#e8f2ff] hover:bg-[#dbeafe] text-[13px] font-bold text-[#3b7dd8] transition"
                       >
-                        翻开看看 ›
+                        翻开原帖看看 ›
                       </a>
+                      <button
+                        onClick={() => {
+                          setDrawer(null);
+                          handleGoOutdoors();
+                        }}
+                        className="text-[12px] font-semibold text-[#9a6b3b] hover:text-[#784315] cursor-pointer"
+                      >
+                        让看山再出门换一批
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Quick pills for the other two glowing treasures currently in the room */}
+                  <div className="flex items-center gap-2 pt-0.5">
+                    {store.hoardedItems.map((h) => (
+                      <button
+                        key={h.id}
+                        onClick={() => setSelectedHoard(h)}
+                        className={`flex-1 py-2 px-2.5 rounded-full text-[12px] font-bold truncate transition cursor-pointer ${
+                          selectedHoard.id === h.id
+                            ? "bg-[#63a4f7] text-white shadow-2xs"
+                            : "bg-white/90 text-[#6e5a49] shadow-2xs"
+                        }`}
+                      >
+                        {h.itemName}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* REPLIES TO PUBLISHED SNOWBALL */}
+              {drawer === "replies" && (
+                <div className="space-y-3">
+                  {store.publishedAnswers.length > 0 ? (
+                    store.publishedAnswers.map((ans) => (
+                      <div
+                        key={ans.id}
+                        className="p-4 rounded-[22px] bg-[#fff9ed] border border-[#fde68a]/70 space-y-2.5"
+                      >
+                        <div className="flex items-center justify-between">
+                          <span className="text-[13px] font-bold text-[#9a5b25]">
+                            寄出的雪球收到了 {ans.upvotes} 份赞同
+                          </span>
+                          <span className="text-[11px] text-[#a38b73]">{ans.createdAt}</span>
+                        </div>
+                        <p className="text-[12px] text-[#6e5a49] line-clamp-2">{ans.content}</p>
+                        <div className="space-y-2 pt-1">
+                          {ans.warmComments.map((c, idx) => (
+                            <div
+                              key={idx}
+                              className="p-3 rounded-[16px] bg-white/95 text-[13px] text-[#5c4a3a] shadow-2xs"
+                            >
+                              <span className="font-bold text-[#784315]">{c.author}：</span>「
+                              {c.text}」
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="p-4 rounded-[22px] bg-white text-[13px] text-[#6e7f94]">
+                      还没有寄出过雪球信，点看山身边的雪球就能写一封啦。
                     </div>
                   )}
                 </div>
@@ -1075,7 +1169,6 @@ export default function CozyKnowShanApp() {
                   <button
                     onClick={() => {
                       postState({ action: "reset_storyline" });
-                      setIsStackingSnow(false);
                       setDrawer(null);
                       showToast("已回到最初");
                     }}

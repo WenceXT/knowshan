@@ -55,12 +55,14 @@ export interface WhisperEntry {
   structuredSummary: string;
   corePainPoint: string;
   hiddenValue: string;
+  bubbleQuestion?: string;
   matchedQuestionIds: string[];
 }
 
 export interface ZhihuQuestion {
   id: string;
   title: string;
+  bubblePrompt?: string;
   topic: string;
   followers: number;
   views: string;

@@ -1,6 +1,6 @@
 "use client";
 
-import { ACCESSORIES, createInitialStore } from "@/lib/seed";
+import { ACCESSORIES, ALL_HOARD_TREASURES, createInitialStore } from "@/lib/seed";
 import {
   analyzeWhisperText,
   computePersonaMirror,
@@ -9,7 +9,7 @@ import {
 } from "@/lib/ai-engine";
 import { AccessoryItem, KnowShanStore, PetMood, ZhihuQuestion } from "@/types/knowshan";
 
-const STORAGE_KEY = "knowshan_store_v4";
+const STORAGE_KEY = "knowshan_store_v6";
 const IS_STATIC = process.env.NEXT_PUBLIC_STATIC_MODE === "true";
 
 function loadLocalStore(): KnowShanStore {
@@ -135,6 +135,18 @@ export async function apiPostState(payload: Record<string, unknown>): Promise<{
     return { store: saveLocalStore(store) };
   }
 
+  if (payload.action === "refresh_hoard") {
+    const firstId = store.hoardedItems[0]?.id;
+    const curIdx = ALL_HOARD_TREASURES.findIndex((t) => t.id === firstId);
+    const nextStart = curIdx < 0 ? 0 : (curIdx + 3) % ALL_HOARD_TREASURES.length;
+    store.hoardedItems = ALL_HOARD_TREASURES.slice(nextStart, nextStart + 3);
+    store.pet.mood = "happy";
+    store.pet.exp += 10;
+    store.pet.level = Math.floor(store.pet.exp / 120) + 1;
+    store.pet.statusMessage = "刚从知乎雪原逛回来，给你叼了三件闪闪发光的新宝贝放地上啦";
+    return { store: saveLocalStore(store) };
+  }
+
   return { store: saveLocalStore(store) };
 }
 
@@ -159,7 +171,19 @@ export async function apiSubmitWhisper(
   const entry = await analyzeWhisperText(rawText, source, store.persona);
   store.whispers = [entry, ...store.whispers];
   if (entry.matchedQuestionIds.length > 0) {
-    store.activeQuestionId = entry.matchedQuestionIds[0];
+    const qId = entry.matchedQuestionIds[0];
+    store.activeQuestionId = qId;
+    const q = store.questions.find((item) => item.id === qId);
+    if (q && (!store.dialogues[qId] || store.dialogues[qId].length === 0)) {
+      store.dialogues[qId] = [
+        {
+          id: `m-${Date.now()}`,
+          role: "kanshan",
+          content: `刚听你念叨完，我发现外面有 ${q.topic}这个话题：「${entry.bubbleQuestion || q.bubblePrompt || q.title}」——回想刚才那幕，最戳中你的一个小细节是什么呀？`,
+          createdAt: entry.createdAt,
+        },
+      ];
+    }
   }
   store.pet.exp += 25;
   store.pet.level = Math.floor(store.pet.exp / 120) + 1;
