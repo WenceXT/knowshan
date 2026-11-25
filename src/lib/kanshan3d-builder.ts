@@ -299,14 +299,14 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
   };
 
   const lowerCoil = new THREE.Mesh(
-    new THREE.TubeGeometry(makeCoilCurve(-0.02, -0.015, 0.035, 0.005), 72, 0.062, 18, true),
+    new THREE.TubeGeometry(makeCoilCurve(-0.02, -0.015, 0.035, 0.005), 72, 0.045 * S, 18, true),
     woolMat
   );
   lowerCoil.castShadow = true;
   group.add(lowerCoil);
 
   const upperCoil = new THREE.Mesh(
-    new THREE.TubeGeometry(makeCoilCurve(0.032, -0.012, 0.028, -0.004), 72, 0.058, 18, true),
+    new THREE.TubeGeometry(makeCoilCurve(0.032, -0.012, 0.028, -0.004), 72, 0.042 * S, 18, true),
     woolMat
   );
   upperCoil.castShadow = true;
@@ -315,7 +315,7 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
   const knotAngle = 0.36;
   const knotY = -0.045;
   const knotR = (findBodyRadiusAtAngle(knotY, knotAngle) + 0.016) * S;
-  const knotMesh = new THREE.Mesh(new THREE.SphereGeometry(0.092, 20, 20), woolMat);
+  const knotMesh = new THREE.Mesh(new THREE.SphereGeometry(0.066 * S, 20, 20), woolMat);
   knotMesh.scale.set(1.18, 0.92, 0.88);
   knotMesh.position.set(Math.sin(knotAngle) * knotR, knotY * S, Math.cos(knotAngle) * knotR);
   knotMesh.rotation.y = knotAngle;
@@ -342,8 +342,8 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
     }
     const tailCurve = new THREE.CatmullRomCurve3(curvePts);
 
-    const w = 0.076 * widthScale;
-    const th = 0.022;
+    const w = 0.054 * S * widthScale;
+    const th = 0.016 * S;
     const rectShape = new THREE.Shape();
     rectShape.moveTo(-w, -th);
     rectShape.quadraticCurveTo(0, -th * 1.25, w, -th);
@@ -354,8 +354,8 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
     const extrudeGeo = new THREE.ExtrudeGeometry(rectShape, {
       steps: 24,
       bevelEnabled: true,
-      bevelThickness: 0.01,
-      bevelSize: 0.008,
+      bevelThickness: 0.007 * S,
+      bevelSize: 0.006 * S,
       bevelSegments: 4,
       extrudePath: tailCurve,
     });
@@ -365,10 +365,10 @@ export function buildContouredKnittedScarf(S: number): THREE.Group {
 
     const endPt = curvePts[curvePts.length - 1];
     for (let f = -1.5; f <= 1.5; f += 1) {
-      const tassel = new THREE.Mesh(new THREE.CapsuleGeometry(0.013, 0.038, 8, 10), fringeMat);
+      const tassel = new THREE.Mesh(new THREE.CapsuleGeometry(0.009 * S, 0.028 * S, 8, 10), fringeMat);
       const offsetAngle = endAngle + f * 0.05;
       const tr = (findBodyRadiusAtAngle(endY, offsetAngle) + protrude) * S;
-      tassel.position.set(Math.sin(offsetAngle) * tr, endPt.y - 0.032, Math.cos(offsetAngle) * tr);
+      tassel.position.set(Math.sin(offsetAngle) * tr, endPt.y - 0.024 * S, Math.cos(offsetAngle) * tr);
       tassel.rotation.z = -offsetAngle * 0.22;
       tailGroup.add(tassel);
     }

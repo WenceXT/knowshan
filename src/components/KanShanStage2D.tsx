@@ -285,7 +285,7 @@ export default function KanShanStage2D({
 
         <svg
           viewBox="0 0 360 440"
-          className="w-[300px] sm:w-[335px] h-auto overflow-visible drop-shadow-[0_14px_24px_rgba(92,130,178,0.2)]"
+          className="w-[218px] sm:w-[242px] mt-10 h-auto overflow-visible drop-shadow-[0_12px_22px_rgba(92,130,178,0.18)]"
         >
           <defs>
             {/* Storybook Paper-Cream Body Shading */}

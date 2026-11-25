@@ -108,9 +108,9 @@ export default function KanShanStage3D({
       if (w <= 0 || h <= 0) return;
       const aspect = w / h;
       camera.aspect = aspect;
-      const extraZ = aspect < 0.72 ? (0.72 - aspect) * 9.2 : 0;
-      camera.position.set(0, 0.48, 9.5 + extraZ);
-      camera.lookAt(0, -0.32, 0);
+      const extraZ = aspect < 0.72 ? (0.72 - aspect) * 7.5 : 0;
+      camera.position.set(0, 0.52, 9.8 + extraZ);
+      camera.lookAt(0, -0.38, 0);
       camera.updateProjectionMatrix();
       renderer.setSize(w, h, false);
     };
@@ -244,27 +244,28 @@ export default function KanShanStage3D({
     roomGroup.add(pawRug);
 
     // =========================================================
-    // 2. SITTING MARSHMALLOW LIU KANSHAN (1:1 BLIND-BOX PROPORTIONS!)
+    // 2. SITTING MARSHMALLOW LIU KANSHAN (PETITE COZY BLIND-BOX SCALE!)
     // =========================================================
     const charRoot = new THREE.Group();
-    // Sitting squarely right on the puffy white paw rug!
-    charRoot.position.set(0, -0.58, 0.16);
+    // Sitting cozily right in the center of the puffy white paw rug!
+    charRoot.position.set(0, -0.79, 0.22);
     scene.add(charRoot);
 
-    const S = 1.46;
+    const S = 1.02;
+    const K = S / 1.46; // Proportional scale ratio for limbs & props
 
     // Bag Charm Lanyard
     const lanyardGroup = new THREE.Group();
     const strap = new THREE.Mesh(
-      new THREE.CylinderGeometry(0.048, 0.048, 0.82, 16),
+      new THREE.CylinderGeometry(0.048 * K, 0.048 * K, 0.82 * K, 16),
       new THREE.MeshStandardMaterial({ color: 0x4a8df8, roughness: 0.55 })
     );
-    strap.position.set(0, 1.32, -0.02);
+    strap.position.set(0, 1.32 * K, -0.02 * K);
     const clasp = new THREE.Mesh(
-      new THREE.TorusGeometry(0.18, 0.036, 16, 32),
+      new THREE.TorusGeometry(0.18 * K, 0.036 * K, 16, 32),
       new THREE.MeshStandardMaterial({ color: 0xe2e8f0, metalness: 0.88, roughness: 0.18 })
     );
-    clasp.position.set(0, 1.78, -0.02);
+    clasp.position.set(0, 1.78 * K, -0.02 * K);
     lanyardGroup.add(strap, clasp);
     charRoot.add(lanyardGroup);
 
@@ -309,15 +310,15 @@ export default function KanShanStage3D({
     whiteBodyMesh.name = "head";
     kanshanRig.add(whiteBodyMesh);
 
-    // B)Two Chubby Marshmallow Sitting Short Feet in Front (Exact match to reference!)
+    // B) Two Chubby Marshmallow Sitting Short Feet in Front (Exact match to reference!)
     [-1, 1].forEach((side) => {
       const foot = new THREE.Mesh(
-        new THREE.CapsuleGeometry(0.145, 0.16, 18, 24),
+        new THREE.CapsuleGeometry(0.145 * K, 0.16 * K, 18, 24),
         vinylWhiteMat
       );
       foot.rotation.x = Math.PI / 2;
       foot.scale.set(0.96, 1.0, 0.88);
-      foot.position.set(side * 0.28, -0.56, 0.48);
+      foot.position.set(side * 0.28 * K, -0.56 * K, 0.48 * K);
       foot.castShadow = true;
       foot.receiveShadow = true;
       kanshanRig.add(foot);
@@ -376,8 +377,8 @@ export default function KanShanStage3D({
       // Build smooth teardrop-tapered plush arm using stacked spheres/capsules along curve
       const armCurve = new THREE.CatmullRomCurve3([
         new THREE.Vector3(0, 0, 0),
-        new THREE.Vector3(side * 0.12, -0.22, 0.05),
-        new THREE.Vector3(side * 0.14, -0.46, 0.12),
+        new THREE.Vector3(side * 0.12 * K, -0.22 * K, 0.05 * K),
+        new THREE.Vector3(side * 0.14 * K, -0.46 * K, 0.12 * K),
       ]);
 
       // Tapered custom tube geometry (thicker toward the cute chubby paw!)
@@ -392,8 +393,8 @@ export default function KanShanStage3D({
         const p = armCurve.getPointAt(u);
         const N = frames.normals[i];
         const B = frames.binormals[i];
-        // Taper from 0.048 at shoulder -> 0.076 plump wrist!
-        const r = 0.048 + u * 0.028;
+        // Taper from shoulder -> plump wrist!
+        const r = (0.048 + u * 0.028) * K;
         for (let j = 0; j <= radialSegs; j++) {
           const v = (j / radialSegs) * Math.PI * 2;
           const sin = Math.sin(v);
@@ -422,14 +423,14 @@ export default function KanShanStage3D({
       armMesh.castShadow = true;
 
       // Plump rounded paw tip + cute little inner thumb nub!
-      const pawEnd = new THREE.Mesh(new THREE.SphereGeometry(0.076, 20, 20), velvetSlateMat);
+      const pawEnd = new THREE.Mesh(new THREE.SphereGeometry(0.076 * K, 20, 20), velvetSlateMat);
       pawEnd.scale.set(0.95, 1.08, 0.95);
-      pawEnd.position.set(side * 0.14, -0.46, 0.12);
+      pawEnd.position.set(side * 0.14 * K, -0.46 * K, 0.12 * K);
       pawEnd.castShadow = true;
 
-      const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.034, 14, 14), velvetSlateMat);
+      const thumb = new THREE.Mesh(new THREE.SphereGeometry(0.034 * K, 14, 14), velvetSlateMat);
       thumb.scale.set(1.2, 0.85, 0.9);
-      thumb.position.set(side * 0.085, -0.44, 0.165);
+      thumb.position.set(side * 0.085 * K, -0.44 * K, 0.165 * K);
 
       pivot.add(armMesh, pawEnd, thumb);
       return pivot;
@@ -443,7 +444,7 @@ export default function KanShanStage3D({
     // 3. THREE FLUFFY STACKED SNOWBALLS RIGHT BETWEEN SITTING FEET!
     // =========================================================
     const snowStack = new THREE.Group();
-    snowStack.position.set(0, -0.74, 0.72);
+    snowStack.position.set(0, -0.74 * K, 0.72 * K);
     const snowMat = new THREE.MeshStandardMaterial({
       color: 0xffffff,
       roughness: 0.92,
@@ -451,20 +452,20 @@ export default function KanShanStage3D({
       emissiveIntensity: 0.1,
     });
 
-    const sb1 = new THREE.Mesh(new THREE.SphereGeometry(0.21, 24, 24), snowMat);
+    const sb1 = new THREE.Mesh(new THREE.SphereGeometry(0.21 * K, 24, 24), snowMat);
     sb1.scale.set(1.08, 0.9, 1.08);
-    sb1.position.set(0, 0.14, 0.12);
+    sb1.position.set(0, 0.14 * K, 0.12 * K);
     sb1.castShadow = true;
     sb1.name = "snowman";
 
-    const sb2 = new THREE.Mesh(new THREE.SphereGeometry(0.18, 24, 24), snowMat);
+    const sb2 = new THREE.Mesh(new THREE.SphereGeometry(0.18 * K, 24, 24), snowMat);
     sb2.scale.set(1.05, 0.92, 1.05);
-    sb2.position.set(0, 0.41, 0.04);
+    sb2.position.set(0, 0.41 * K, 0.04 * K);
     sb2.castShadow = true;
     sb2.name = "snowman";
 
-    const sb3 = new THREE.Mesh(new THREE.SphereGeometry(0.155, 24, 24), snowMat);
-    sb3.position.set(0, 0.66, -0.02);
+    const sb3 = new THREE.Mesh(new THREE.SphereGeometry(0.155 * K, 24, 24), snowMat);
+    sb3.position.set(0, 0.66 * K, -0.02 * K);
     sb3.castShadow = true;
     sb3.name = "snowman";
 
@@ -478,6 +479,7 @@ export default function KanShanStage3D({
     kanshanRig.add(glassesGroup);
 
     const scarfGroup = buildContouredKnittedScarf(S);
+    scarfGroup.scale.setScalar(1); // Already built using S!
     kanshanRig.add(scarfGroup);
 
     const beanieGroup = buildKnittedBeanie(S);
@@ -487,7 +489,8 @@ export default function KanShanStage3D({
     kanshanRig.add(muffsGroup);
 
     const fishGroup = buildCuteCodfish();
-    fishGroup.position.set(0.76, -0.44, 0.28);
+    fishGroup.scale.setScalar(K);
+    fishGroup.position.set(0.76 * K, -0.44 * K, 0.28 * K);
     fishGroup.rotation.z = -0.35;
     kanshanRig.add(fishGroup);
 
@@ -663,7 +666,7 @@ export default function KanShanStage3D({
       // Gentle adorable head/body tilt rock (`晃悠`)
       kanshanRig.rotation.z = Math.sin(t * 1.35) * 0.022;
 
-      const baseY = bagMode ? -0.18 + Math.sin(t * 2) * 0.05 : -0.58;
+      const baseY = bagMode ? -0.35 + Math.sin(t * 2) * 0.05 : -0.79;
       charRoot.position.y = baseY + sp.jumpY;
       charRoot.rotation.y += (rotYRef.current - charRoot.rotation.y) * 0.12;
 

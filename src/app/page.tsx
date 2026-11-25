@@ -604,7 +604,7 @@ export default function CozyKnowShanApp() {
         ) : (
           <button
             onClick={() => (isStackingSnow ? openSnowmanLetter() : setDrawer("bubble"))}
-            className="absolute top-[168px] left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 rounded-full bg-[#fdfbf7]/85 hover:bg-[#fdfbf7] backdrop-blur-md shadow-[0_4px_14px_rgba(130,160,200,0.18)] text-[13px] font-semibold text-[#6e4720] whitespace-nowrap transition cursor-pointer"
+            className="absolute top-[224px] left-1/2 -translate-x-1/2 z-10 px-4 py-1.5 rounded-full bg-[#fdfbf7]/85 hover:bg-[#fdfbf7] backdrop-blur-md shadow-[0_4px_14px_rgba(130,160,200,0.18)] text-[13px] font-semibold text-[#6e4720] whitespace-nowrap transition cursor-pointer"
           >
             {isStackingSnow
               ? "三颗雪球团好咯，拆开看看吧"
